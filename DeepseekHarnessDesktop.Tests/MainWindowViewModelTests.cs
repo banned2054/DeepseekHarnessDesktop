@@ -939,13 +939,41 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         viewModel.SessionListModeIndex = 0;
         var selectedBefore = viewModel.SelectedSession;
 
-        // 后台新增会话（SessionsChanged → 延迟合并刷新）：选中实例不变，
+        // 后台新增并发送消息的会话（SessionsChanged → 延迟合并刷新）：选中实例不变，
         // 但行投影必须重建出新会话（回归：提前 return 曾跳过重建）。
         var created = await sessionService.CreateSessionAsync();
+        await sessionService.SendPromptAsync(created.Id, "background-request", "后台消息");
         await WaitUntilAsync(() => viewModel.SessionRows.OfType<SessionItemViewModel>()
                                             .Any(session => session.Id == created.Id));
         Assert.Same(selectedBefore, viewModel.SelectedSession);
         Assert.True(selectedBefore!.IsCurrent);
+
+        await viewModel.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task SessionListHidesHistoricalBlankSessionsButKeepsSelectedBlankUntilFirstPrompt()
+    {
+        var sessionService = new SimulatedSessionService();
+        var viewModel = new MainWindowViewModel(sessionService, new SimulatedBackendStatusService(),
+                                                new StaticWorkspaceService());
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.SelectedSession is not null);
+
+        var historicalBlank = await sessionService.CreateSessionAsync();
+        await WaitUntilAsync(() => viewModel.Sessions.All(session => session.Id != historicalBlank.Id));
+
+        var previousSelection = viewModel.SelectedSession;
+        viewModel.NewSessionCommand.Execute(null);
+        await WaitUntilAsync(() => !ReferenceEquals(viewModel.SelectedSession, previousSelection));
+        var currentBlank = viewModel.SelectedSession!;
+        Assert.Contains(viewModel.Sessions, session => session.Id == currentBlank.Id);
+
+        await sessionService.SendPromptAsync(currentBlank.Id, "first-request", "第一条消息");
+        await WaitUntilAsync(() => viewModel.Sessions.Any(session => session.Id == currentBlank.Id));
+
+        var currentSummary = (await sessionService.GetSessionsAsync()).Single(summary => summary.Id == currentBlank.Id);
+        Assert.False(currentSummary.Blank);
 
         await viewModel.DisposeAsync();
     }

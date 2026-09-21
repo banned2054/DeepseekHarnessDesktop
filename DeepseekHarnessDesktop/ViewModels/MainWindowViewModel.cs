@@ -540,7 +540,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
     private async Task RefreshSessionsAsync(CancellationToken cancellationToken)
     {
-        var summaries = await _sessionService.GetSessionsAsync(cancellationToken);
+        var selectedSessionId = SelectedSession?.Id;
+        var summaries = (await _sessionService.GetSessionsAsync(cancellationToken))
+                       .Where(summary => !summary.Blank || summary.Id == selectedSessionId).ToArray();
 
         // 就地更新既有条目：重建 ObservableCollection 会替换选中实例，
         // 触发重新订阅并让新快照清掉流式气泡，生成中的内容会闪动。
