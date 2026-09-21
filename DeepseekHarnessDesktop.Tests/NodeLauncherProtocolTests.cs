@@ -1,6 +1,6 @@
+using DeepseekHarnessDesktop.Core.Models;
 using DeepseekHarnessDesktop.Infrastructure.Exceptions;
 using DeepseekHarnessDesktop.Infrastructure.Services.Backend;
-using DeepseekHarnessDesktop.Core.Models;
 using Xunit;
 
 namespace DeepseekHarnessDesktop.Tests;
