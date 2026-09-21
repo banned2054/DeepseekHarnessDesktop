@@ -377,3 +377,4 @@ package.json
 !.env.example
 .DS_Store
 Thumbs.db
+.dsh/
