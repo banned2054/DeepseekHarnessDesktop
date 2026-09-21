@@ -144,8 +144,8 @@
             <SolidColorBrush x:Key="CodeBlockButtonActiveBrush" Color="#2EFFFFFF" />
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Dark">
-                    <!-- 表面 -->
-                    <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#171B25" />
+                    <!-- 表面：侧栏底色为本轮指定的 #1B1B1C 中性灰。 -->
+                    <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#1B1B1C" />
                     <SolidColorBrush x:Key="ChatBackgroundBrush" Color="#10131B" />
                     <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#202532" />
                     <SolidColorBrush x:Key="SubtleBorderBrush" Color="#252B3A" />
@@ -155,9 +155,15 @@
                     <SolidColorBrush x:Key="ComposerTextBrush" Color="#F1F1F3" />
                     <SolidColorBrush x:Key="ComposerTextMutedBrush" Color="#A7ABB4" />
                     <SolidColorBrush x:Key="ComposerActionBrush" Color="#679EFE" />
-                    <!-- 会话列表 -->
-                    <SolidColorBrush x:Key="SessionHoverBrush" Color="#283044" />
-                    <SolidColorBrush x:Key="SessionSelectedBrush" Color="#34466B" />
+                    <!-- 会话列表：选中态为本轮指定的 #2D2D2E；悬停取其与底色之间的
+                         中性灰 #262627——清晰但不过亮，也不会盖过选中态。 -->
+                    <SolidColorBrush x:Key="SessionHoverBrush" Color="#262627" />
+                    <SolidColorBrush x:Key="SessionSelectedBrush" Color="#2D2D2E" />
+                    <!-- 侧栏顶部「新建会话」按钮三态（对齐 DSH newSession 的实底形态）：
+                         常规 #43454A、悬停微亮、按下/激活 #353638。 -->
+                    <SolidColorBrush x:Key="NewSessionButtonBrush" Color="#43454A" />
+                    <SolidColorBrush x:Key="NewSessionButtonHoverBrush" Color="#4C4E53" />
+                    <SolidColorBrush x:Key="NewSessionButtonActiveBrush" Color="#353638" />
                     <!-- 消息气泡 -->
                     <SolidColorBrush x:Key="UserBubbleBrush" Color="#3B5CCC" />
                     <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFFFF" />
@@ -192,6 +198,11 @@
                     <SolidColorBrush x:Key="OnAccentMutedBrush" Color="#E7EEFF" />
                     <!-- 悬浮输入面板发送按钮悬停：气泡强调色加深一档。 -->
                     <SolidColorBrush x:Key="ComposerSendHoverBrush" Color="#3563D9" />
+                    <!-- 侧栏顶部「新建会话」按钮三态的浅色对应：实底中性灰同构。
+                         （当前应用固定 Dark 主题，浅色值仅保持语义资源完整性。） -->
+                    <SolidColorBrush x:Key="NewSessionButtonBrush" Color="#E7EAEE" />
+                    <SolidColorBrush x:Key="NewSessionButtonHoverBrush" Color="#DDE0E4" />
+                    <SolidColorBrush x:Key="NewSessionButtonActiveBrush" Color="#D2D5DA" />
                     <!-- 文本与状态：label-tertiary / link / warn-label / success / error-primary -->
                     <SolidColorBrush x:Key="TextMutedBrush" Color="#81858C" />
                     <SolidColorBrush x:Key="AccentTextBrush" Color="#4176E6" />

@@ -8,7 +8,8 @@ public sealed class SessionGroupHeaderViewModel(
     string   title,
     int      sessionCount,
     bool     isExpanded,
-    ICommand toggleCommand)
+    ICommand toggleCommand,
+    bool     isCurrent = false)
 {
     /// <summary>分组标识；工作区 id 或未分组的固定哨兵值。</summary>
     public string Key { get; } = key;
@@ -18,6 +19,9 @@ public sealed class SessionGroupHeaderViewModel(
     public int SessionCount { get; } = sessionCount;
 
     public bool IsExpanded { get; } = isExpanded;
+
+    /// <summary>该组是否包含当前选中的会话；驱动工作区行的选中高亮。</summary>
+    public bool IsCurrent { get; } = isCurrent;
 
     public string CountText => SessionCount > 0 ? $"{SessionCount} 个会话" : "暂无会话";
 

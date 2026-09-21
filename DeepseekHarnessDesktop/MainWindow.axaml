@@ -214,20 +214,24 @@
             <Setter Property="Background" Value="{DynamicResource SessionHoverBrush}" />
         </Style>
         <!-- 会话列表行与分组头行：自定义模板自绘 hover/选中高亮，
-             点击分别驱动选择会话与展开收起（分组行不可选）。
+             点击分别驱动选择会话与展开收起。
+             基础行规格取自 DSH WorkspaceBrowser 的 Rows.module.css：
+             行高 34（工作区）/32（对话）、水平内边距 8、圆角 8、行距 2。
+             行保持键盘焦点可达：Tab 聚焦、Enter/Space 触发；:focus-visible 显示高亮。
              HorizontalAlignment 显式 Stretch：行宽恒等于列表内容区宽度，
              不随标题长度伸缩（Fluent 12 下按钮默认对齐不再横向撑满）。 -->
         <Style Selector="Button.session-row, Button.group-header">
-            <Setter Property="Focusable" Value="False" />
             <Setter Property="Padding" Value="12" />
-            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="Margin" Value="0,2" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate>
-                        <Border x:Name="PART_Surface" CornerRadius="10" Padding="{TemplateBinding Padding}"
+                        <Border x:Name="PART_Surface" CornerRadius="8" Padding="{TemplateBinding Padding}"
                                 Background="Transparent">
                             <!-- 自定义模板的 ContentPresenter 必须显式携带按钮内容，
                                  缺省绑定会把行内文字整体吞掉（只剩固定尺寸元素）。 -->
@@ -240,17 +244,61 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- 对话行相对工作区行缩进一个完整图标步进：8（行内边距）+8（箭头）+4（间距）
+             +16（文件夹图标）+4（间距）= 40，标题与工作区标题左对齐，
+             形成明确的 tab 式层级；行命中区域仍占满整行宽。 -->
+        <Style Selector="Button.session-row">
+            <Setter Property="Padding" Value="40,0,8,0" />
+        </Style>
+        <Style Selector="Button.group-header">
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Padding" Value="8,0" />
+        </Style>
+        <!-- 状态样式声明顺序即优先级：悬停与焦点在前、选中（.current）最后，
+             保证行被悬停或键盘聚焦时当前选中态不被覆盖。 -->
         <Style Selector="Button.session-row:pointerover /template/ Border#PART_Surface">
             <Setter Property="Background" Value="{DynamicResource SessionHoverBrush}" />
         </Style>
+        <Style Selector="Button.group-header:pointerover /template/ Border#PART_Surface">
+            <Setter Property="Background" Value="{DynamicResource SessionHoverBrush}" />
+        </Style>
+        <Style
+            Selector="Button.session-row:focus-visible /template/ Border#PART_Surface, Button.group-header:focus-visible /template/ Border#PART_Surface">
+            <Setter Property="Background" Value="{DynamicResource SessionHoverBrush}" />
+        </Style>
+        <!-- 选中态：工作区行（包含当前会话的组）与对话行共用同一选中底色。 -->
         <Style Selector="Button.session-row.current /template/ Border#PART_Surface">
             <Setter Property="Background" Value="{DynamicResource SessionSelectedBrush}" />
         </Style>
-        <Style Selector="Button.group-header /template/ Border#PART_Surface">
-            <Setter Property="Padding" Value="12,6" />
+        <Style Selector="Button.group-header.current /template/ Border#PART_Surface">
+            <Setter Property="Background" Value="{DynamicResource SessionSelectedBrush}" />
         </Style>
-        <Style Selector="Button.group-header:pointerover /template/ Border#PART_Surface">
-            <Setter Property="Background" Value="{DynamicResource SessionHoverBrush}" />
+        <!-- 顶部「新建会话」按钮：形态对齐 DSH 侧栏 newSession——高 38、圆角 12、
+             内边距 16,8、圆形加号与文字间距 6、字号 14 中等字重。
+             Fluent 把状态底色画在模板 ContentPresenter 上，状态覆盖指向该部件。 -->
+        <Style Selector="Button.new-session">
+            <Setter Property="Height" Value="38" />
+            <Setter Property="Padding" Value="16,8" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="{DynamicResource NewSessionButtonBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.new-session:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource NewSessionButtonHoverBrush}" />
+        </Style>
+        <Style Selector="Button.new-session:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource NewSessionButtonActiveBrush}" />
+        </Style>
+        <Style Selector="Button.new-session:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource NewSessionButtonBrush}" />
+        </Style>
+        <Style Selector="Button.new-session:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource NewSessionButtonHoverBrush}" />
         </Style>
         <!-- 悬浮输入面板：对齐 WebUI 的输入卡片——上方输入区、下方工具行，
              统计条留在卡片外侧；面板高度随文本与错误提示增长。 -->
@@ -395,22 +443,37 @@
         </Style>
     </Window.Styles>
 
-    <Grid ColumnDefinitions="290,1*" RowDefinitions="*">
-        <Border Grid.Column="0" Background="{DynamicResource SidebarBackgroundBrush}" Padding="18,20,14,16">
+    <!-- 侧栏宽度 280：DSH WebUI 的展开宽度为用户可拖拽设置（无固定 token），
+         行几何按其样式定义落地后，280 在保留中文标题可读性的同时贴近其默认形态；
+         容器水平内边距取 DSH shell 的 sidebar-inline-padding 令牌（12px）。 -->
+    <Grid ColumnDefinitions="280,1*" RowDefinitions="*">
+        <Border Grid.Column="0" Background="{DynamicResource SidebarBackgroundBrush}" Padding="12,16,12,12">
             <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
                 <StackPanel Spacing="4">
                     <TextBlock Text="DeepSeek Harness" Classes="heading" />
                     <TextBlock Text="原生桌面工作台" Classes="caption" />
                 </StackPanel>
 
+                <!-- 顶部「新建会话」：DSH newSession 形态——左侧 16px 圆形加号图标，
+                     图标与文字间距 6，实底按钮样式见 Button.new-session。 -->
                 <Button Grid.Row="1"
                         Margin="0,24,0,10"
-                        HorizontalContentAlignment="Center"
-                        Content="＋  新建会话"
-                        Command="{Binding NewSessionCommand}" />
+                        Classes="new-session"
+                        AutomationProperties.Name="新建会话"
+                        Command="{Binding NewSessionCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Path Width="16" Height="16"
+                              Data="M8,1.5 A6.5,6.5 0 1 0 8,14.5 A6.5,6.5 0 1 0 8,1.5 Z M5,8 L11,8 M8,5 L8,11"
+                              Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.5"
+                              StrokeLineCap="Round"
+                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <TextBlock Text="新建会话" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
 
-                <!-- 视图模式：单列表 / 按工作区（对齐参考 Web 客户端的视图选项）。 -->
-                <Grid Grid.Row="2" Margin="0,0,0,8" ColumnDefinitions="*,Auto">
+                <!-- 视图模式：单列表 / 按工作区（对齐参考 Web 客户端的视图选项）。
+                     节头下间距 4 对齐 DSH session-list sectionHeader。 -->
+                <Grid Grid.Row="2" Margin="0,0,0,4" ColumnDefinitions="*,Auto">
                     <TextBlock Text="会话" Classes="caption" VerticalAlignment="Center" />
                     <ComboBox Grid.Column="1"
                               MinWidth="100"
@@ -437,25 +500,39 @@
                         <ItemsControl.DataTemplates>
                             <DataTemplate x:DataType="vm:SessionGroupHeaderViewModel">
                                 <Button Classes="group-header"
+                                        Classes.current="{Binding IsCurrent}"
                                         HorizontalAlignment="Stretch"
+                                        AutomationProperties.Name="{Binding TitleText}"
                                         Command="{Binding $parent[Window].DataContext.ToggleGroupCommand}"
                                         CommandParameter="{Binding}">
-                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6"
+                                    <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="4"
                                           HorizontalAlignment="Stretch">
-                                        <Panel Width="8" Height="8" VerticalAlignment="Center">
-                                            <Path Data="M0,0 L4,4 L0,8"
-                                                  Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5"
-                                                  IsVisible="{Binding !IsExpanded}" />
-                                            <Path Data="M0,4 L4,8 L8,4"
-                                                  Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5"
-                                                  IsVisible="{Binding IsExpanded}" />
+                                        <!-- 展开/折叠状态：收起向右、展开向下（DSH arrowOpen 旋转语义）。 -->
+                                        <Panel Grid.Column="0" Width="8" Height="16" VerticalAlignment="Center">
+                                            <Panel VerticalAlignment="Center" Width="8" Height="8">
+                                                <Path Data="M0,0 L4,4 L0,8"
+                                                      Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5"
+                                                      StrokeLineCap="Round"
+                                                      IsVisible="{Binding !IsExpanded}" />
+                                                <Path Data="M0,4 L4,8 L8,4"
+                                                      Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5"
+                                                      StrokeLineCap="Round"
+                                                      IsVisible="{Binding IsExpanded}" />
+                                            </Panel>
                                         </Panel>
-                                        <TextBlock Grid.Column="1" Text="{Binding TitleText}"
-                                                   FontSize="13" FontWeight="SemiBold"
+                                        <!-- DSH WorkspaceBrowser 的 16px 工作区文件夹图标
+                                             （slot 16×20，label-tertiary 描边风格）。 -->
+                                        <Path Grid.Column="1" Width="16" Height="16" VerticalAlignment="Center"
+                                              Data="M2,11.5 L2,4.5 A1.5,1.5 0 0 1 3.5,3 L6.4,3 A1.5,1.5 0 0 1 7.6,3.6 L8.6,5 L13.5,5 A1.5,1.5 0 0 1 15,6.5 L15,11.5 A1.5,1.5 0 0 1 13.5,13 L3.5,13 A1.5,1.5 0 0 1 2,11.5 Z"
+                                              Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5"
+                                              StrokeLineCap="Round" />
+                                        <TextBlock Grid.Column="2" Text="{Binding TitleText}"
+                                                   FontSize="14" FontWeight="SemiBold"
                                                    VerticalAlignment="Center"
                                                    TextTrimming="CharacterEllipsis"
                                                    ToolTip.Tip="{Binding TitleText}" />
-                                        <TextBlock Grid.Column="2" Text="{Binding CountText}" Classes="caption"
+                                        <TextBlock Grid.Column="3" Text="{Binding CountText}" Classes="caption"
+                                                   Margin="4,0,0,0"
                                                    VerticalAlignment="Center" />
                                     </Grid>
                                 </Button>
@@ -464,14 +541,16 @@
                                 <Button Classes="session-row"
                                         Classes.current="{Binding IsCurrent}"
                                         HorizontalAlignment="Stretch"
+                                        AutomationProperties.Name="{Binding TitleText}"
                                         Command="{Binding $parent[Window].DataContext.SelectSessionCommand}"
                                         CommandParameter="{Binding}">
                                     <Grid ColumnDefinitions="*,Auto" RowSpacing="5"
                                           HorizontalAlignment="Stretch">
+                                        <!-- 标题 14px 与工作区标题同规格（DSH Rows title）；层级由
+                                             40px 行缩进表达，不再用字号或字重区分。 -->
                                         <TextBlock Grid.ColumnSpan="1"
                                                    Text="{Binding TitleText}"
                                                    FontSize="14"
-                                                   FontWeight="SemiBold"
                                                    TextTrimming="CharacterEllipsis"
                                                    ToolTip.Tip="{Binding TitleText}" />
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">

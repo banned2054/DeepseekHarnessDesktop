@@ -186,6 +186,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 _statsSeq    = 0;
                 _            = FollowSelectedSessionAsync(value);
                 RebuildSessionPendingApprovals();
+                // 重建行投影：工作区头的 IsCurrent（是否包含当前会话）随选中变化。
+                RebuildSessionRows();
                 OnPropertyChanged(nameof(IsSessionRunning));
                 OnPropertyChanged(nameof(IsModelPickerEnabled));
                 SendMessageCommand.RaiseCanExecuteChanged();
@@ -625,8 +627,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         foreach (var member in memberList) accounted.Add(member.Id);
 
         var expanded = !_collapsedGroups.Contains(key);
-        SessionRows.Add(new SessionGroupHeaderViewModel(key, title, memberList.Count, expanded,
-                                                        ToggleGroupCommand));
+        SessionRows.Add(new SessionGroupHeaderViewModel(key, title, memberList.Count, expanded, ToggleGroupCommand,
+                                                        memberList.Any(member => member.IsCurrent)));
         if (expanded)
             foreach (var member in memberList)
                 SessionRows.Add(member);
