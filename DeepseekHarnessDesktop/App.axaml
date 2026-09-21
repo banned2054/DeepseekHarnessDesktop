@@ -149,6 +149,12 @@
                     <SolidColorBrush x:Key="ChatBackgroundBrush" Color="#10131B" />
                     <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#202532" />
                     <SolidColorBrush x:Key="SubtleBorderBrush" Color="#252B3A" />
+                    <!-- WebUI composer surface: neutral elevated gray against the blue-black chat canvas. -->
+                    <SolidColorBrush x:Key="ComposerBackgroundBrush" Color="#2B2B2F" />
+                    <SolidColorBrush x:Key="ComposerControlBrush" Color="#3A3A40" />
+                    <SolidColorBrush x:Key="ComposerTextBrush" Color="#F1F1F3" />
+                    <SolidColorBrush x:Key="ComposerTextMutedBrush" Color="#A7ABB4" />
+                    <SolidColorBrush x:Key="ComposerActionBrush" Color="#679EFE" />
                     <!-- 会话列表 -->
                     <SolidColorBrush x:Key="SessionHoverBrush" Color="#283044" />
                     <SolidColorBrush x:Key="SessionSelectedBrush" Color="#34466B" />
@@ -157,7 +163,7 @@
                     <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="OnAccentMutedBrush" Color="#DCE5FF" />
                     <!-- 悬浮输入面板发送按钮悬停：气泡强调色提亮一档。 -->
-                    <SolidColorBrush x:Key="ComposerSendHoverBrush" Color="#4C74E0" />
+                    <SolidColorBrush x:Key="ComposerSendHoverBrush" Color="#78A8FF" />
                     <!-- 文本与状态 -->
                     <SolidColorBrush x:Key="TextMutedBrush" Color="#8D96A6" />
                     <SolidColorBrush x:Key="AccentTextBrush" Color="#AFC0FF" />
@@ -171,6 +177,12 @@
                     <SolidColorBrush x:Key="ChatBackgroundBrush" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#F5F6F7" />
                     <SolidColorBrush x:Key="SubtleBorderBrush" Color="#1A000000" />
+                    <!-- WebUI composer surface: light elevated neutral pair. -->
+                    <SolidColorBrush x:Key="ComposerBackgroundBrush" Color="#F4F5F7" />
+                    <SolidColorBrush x:Key="ComposerControlBrush" Color="#E7EAEE" />
+                    <SolidColorBrush x:Key="ComposerTextBrush" Color="#1A1D22" />
+                    <SolidColorBrush x:Key="ComposerTextMutedBrush" Color="#70757E" />
+                    <SolidColorBrush x:Key="ComposerActionBrush" Color="#3964FE" />
                     <!-- 会话列表：nav-item-hover / nav-item-active-accent -->
                     <SolidColorBrush x:Key="SessionHoverBrush" Color="#F1F3F5" />
                     <SolidColorBrush x:Key="SessionSelectedBrush" Color="#E4EDFD" />
