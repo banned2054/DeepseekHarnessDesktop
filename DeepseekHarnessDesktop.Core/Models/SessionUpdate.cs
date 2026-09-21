@@ -55,8 +55,8 @@ public abstract record SessionUpdate
     /// <summary>工具调用落定（tool/result）；按 CallId 匹配先前发起的条目。</summary>
     public sealed record ToolCallSettled(ToolActivity Activity) : SessionUpdate;
 
-    /// <summary>一轮对话收束（turn/end）：界面据此折叠该轮的过程条目。</summary>
-    public sealed record TurnEnded(long Turn, long Seq) : SessionUpdate;
+    /// <summary>一轮对话收束（turn/end）：界面据此折叠该轮的过程条目；Reason 为结束原因。</summary>
+    public sealed record TurnEnded(long Turn, long Seq, string? Reason = null) : SessionUpdate;
 
     public sealed record StreamStarted(string AttemptId) : SessionUpdate;
 

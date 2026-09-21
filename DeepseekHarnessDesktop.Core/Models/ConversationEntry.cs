@@ -50,5 +50,11 @@ public sealed record ToolActivity(
 ///     turn/end 边界事件的占位条目（不可见）。一轮对话以 turn/end 收束：
 ///     界面据此把该轮的过程条目（中间助手消息、工具调用）折叠为过程组，
 ///     规则与参考 Web 客户端的 turn-process 投影一致。
+///     <see cref="Reason" /> 是结束原因（completed/aborted/interrupted）；真实 Host 在
+///     follow 快照尾部会为「开放中的轮」合成 interrupted 边界使窗口自洽，消费方需识别。
 /// </summary>
-public sealed record TurnBoundary(long Seq, long Turn, DateTimeOffset CreatedAt) : ConversationEntry(Seq, CreatedAt);
+public sealed record TurnBoundary(
+    long           Seq,
+    long           Turn,
+    DateTimeOffset CreatedAt,
+    string?        Reason = null) : ConversationEntry(Seq, CreatedAt);

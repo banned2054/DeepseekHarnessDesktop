@@ -288,7 +288,8 @@ public sealed class HarnessSessionService : ISessionService
                 }
                 else if (WireEventJson.TryGetTurnEnd(wireEvent, out var endedTurn))
                 {
-                    yield return new SessionUpdate.TurnEnded(endedTurn, wireEvent.Seq);
+                    yield return new SessionUpdate.TurnEnded(endedTurn, wireEvent.Seq,
+                                                             WireEventJson.TurnEndReason(wireEvent));
                 }
                 else if (wireEvent.Type == "tool/call"
                       && WireEventJson.TryGetToolCall(wireEvent) is { } call)
@@ -297,11 +298,11 @@ public sealed class HarnessSessionService : ISessionService
                         ? callTurn
                         : null;
                     yield return new SessionUpdate.ToolCallStarted(new ToolActivity(wireEvent.Seq, call.CallId,
-                                                                            call.Name, call.Arguments,
-                                                                            ToolActivityStatus.Running, null, null,
-                                                                            DateTimeOffset
-                                                                               .FromUnixTimeMilliseconds(wireEvent
-                                                                                            .Time), Turn : turn));
+                                                                       call.Name, call.Arguments,
+                                                                       ToolActivityStatus.Running, null, null,
+                                                                       DateTimeOffset
+                                                                          .FromUnixTimeMilliseconds(wireEvent
+                                                                              .Time), Turn : turn));
                 }
                 else if (WireEventJson.TryGetToolResult(wireEvent) is { } result)
                 {
@@ -314,8 +315,8 @@ public sealed class HarnessSessionService : ISessionService
                 else if (WireEventJson.TryGetModelSelection(wireEvent) is { } selection)
                 {
                     yield return new SessionUpdate.ModelSelected(new ModelSelection(selection.Provider,
-                                                                          selection.Model,
-                                                                          selection.ReasoningEffort));
+                                                                     selection.Model,
+                                                                     selection.ReasoningEffort));
                 }
 
                 break;
@@ -411,7 +412,8 @@ public sealed class HarnessSessionService : ISessionService
                 case "turn/end" :
                     if (WireEventJson.TryGetTurnEnd(wireEvent, out var endedTurn))
                         entries.Add(new TurnBoundary(wireEvent.Seq, endedTurn,
-                                                     DateTimeOffset.FromUnixTimeMilliseconds(wireEvent.Time)));
+                                                     DateTimeOffset.FromUnixTimeMilliseconds(wireEvent.Time),
+                                                     WireEventJson.TurnEndReason(wireEvent)));
 
                     break;
 

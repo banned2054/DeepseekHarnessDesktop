@@ -99,6 +99,22 @@ public static class WireEventJson
             && TryGetNumber(wireEvent.Data, "turn", out turn);
     }
 
+    /// <summary>
+    ///     turn/end 的结束原因（data.reason.kind，如 completed/aborted/interrupted）；
+    ///     缺失或非字符串返回 null。快照尾部的 interrupted 边界是 Host 为开放轮合成的，
+    ///     不是持久事件，消费方据此区分。
+    /// </summary>
+    public static string? TurnEndReason(SessionWireEvent wireEvent)
+    {
+        return wireEvent is { Type: "turn/end", Data.ValueKind: JsonValueKind.Object } &&
+               wireEvent.Data.TryGetProperty("reason", out var reason)                 &&
+               reason.ValueKind == JsonValueKind.Object                                &&
+               reason.TryGetProperty("kind", out var kind)                             &&
+               kind.ValueKind == JsonValueKind.String
+            ? kind.GetString()
+            : null;
+    }
+
     /// <summary>消息内容块中是否含 tool-call 块（这类消息是轮次提交，不是可见回复）。</summary>
     public static bool HasToolCallBlocks(WireMessage message)
     {

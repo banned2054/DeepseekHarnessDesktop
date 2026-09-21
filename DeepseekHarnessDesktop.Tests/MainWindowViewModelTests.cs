@@ -3,15 +3,35 @@ using DeepseekHarnessDesktop.Core.Models;
 using DeepseekHarnessDesktop.Core.Services;
 using DeepseekHarnessDesktop.Infrastructure.Services;
 using DeepseekHarnessDesktop.ViewModels;
+using System.Runtime.CompilerServices;
+using System.Threading.Channels;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace DeepseekHarnessDesktop.Tests;
 
-public sealed class MainWindowViewModelTests
+public sealed class MainWindowViewModelTests(ITestOutputHelper output)
 {
     private static readonly Lock AvaloniaSetupLock = new();
 
     private static bool _avaloniaIsInitialized;
+
+    /// <summary>带现场转储的等待：超时前输出 ViewModel 关键状态，便于定位偶发竞态。</summary>
+    private async Task WaitOrDumpAsync(MainWindowViewModel viewModel, Func<bool> condition, int timeoutMilliseconds)
+    {
+        try
+        {
+            await WaitUntilAsync(condition, timeoutMilliseconds);
+        }
+        catch (Xunit.Sdk.XunitException)
+        {
+            output.WriteLine($"等待超时现场：selected={viewModel.SelectedSession?.Id} " +
+                             $"usage={viewModel.Usage?.ToString() ?? "<null>"} " +
+                             $"stats={viewModel.Stats?.ToString() ?? "<null>"} " +
+                             $"error=\"{viewModel.ErrorText}\" items={viewModel.ConversationItems.Count}");
+            throw;
+        }
+    }
 
     [Fact]
     public async Task MainWindowReceivesTheComposedViewModelAsDataContext()
@@ -244,6 +264,42 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task StatsStripStaysHiddenForBlankSessionUntilUsageArrives()
+    {
+        var sessionService = new SimulatedSessionService();
+        var backendService = new SimulatedBackendStatusService();
+        var viewModel      = new MainWindowViewModel(sessionService, backendService, new StaticWorkspaceService());
+        await viewModel.InitializeAsync();
+
+        // 默认选中的长会话有计费步：统计条可见。
+        await WaitUntilAsync(() => viewModel.HasStatsData);
+
+        // 新建空会话：follow 快照会回填全 0 的 usage/stats 整值（对齐真实后端冷会话
+        // 携带投影 wire 视图的口径），统计条保持隐藏，不显示占位「—」。
+        viewModel.NewSessionCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.SelectedSession is { Id: not "session-history" });
+        // 等待零值基线本身：仅判非 null 可能命中上一会话尚未清空的旧值（短暂可见性窗口）。
+        await WaitOrDumpAsync(viewModel, () => viewModel.Usage is { OutputTokens: 0, UncachedInputTokens: 0 }
+                                            && viewModel.Stats is { Steps       : 0 }, 5000);
+        Assert.False(viewModel.HasStatsData);
+
+        // 首条助手回复落地：投影转为非零，统计条出现。
+        var blankSessionId = viewModel.SelectedSession!.Id;
+        sessionService.PushAssistantReply(blankSessionId, "空会话的第一条回复");
+        await WaitUntilAsync(() => viewModel.HasStatsData);
+        Assert.False(viewModel.HasError);
+
+        // 再切到另一个空会话：按会话重置后重新隐藏。
+        viewModel.NewSessionCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.SelectedSession!.Id != blankSessionId);
+        await WaitOrDumpAsync(viewModel, () => viewModel.Usage is { OutputTokens: 0, UncachedInputTokens: 0 }
+                                            && viewModel.Stats is { Steps       : 0 }, 5000);
+        Assert.False(viewModel.HasStatsData);
+
+        await viewModel.DisposeAsync();
+    }
+
+    [Fact]
     public async Task SessionListRefreshKeepsSelectedInstanceAndStreamingBubble()
     {
         var sessionService = new SimulatedSessionService();
@@ -288,7 +344,7 @@ public sealed class MainWindowViewModelTests
         // turn/end 边界不产生可见条目，可见项为 5。
         await WaitUntilAsync(() => viewModel.ConversationItems.Count == 5);
 
-        // 历史未读全时不折叠（对齐参考 Web 客户端的 historyIncomplete）。
+        // 首轮被窗口截断（turn 4 的用户消息与首个思考在窗口之外）：起点未观察到，不折叠。
         Assert.True(viewModel.HasMoreHistory);
         Assert.Equal(27, viewModel.ConversationItems[0].Seq);
         Assert.DoesNotContain(viewModel.ConversationItems, item => item is TurnProcessGroupViewModel);
@@ -296,6 +352,14 @@ public sealed class MainWindowViewModelTests
         viewModel.LoadOlderCommand.Execute(null);
         await WaitUntilAsync(() => viewModel.ConversationItems[0].Seq == 23 && !viewModel.IsLoadingOlder);
         Assert.True(viewModel.HasMoreHistory);
+
+        // 窗口补全后 turn 4 的用户消息已可见：尽管更早历史未读，该轮即折叠——
+        // 对齐 WebUI 实时会话的形态（其已加载窗口天然是全量，读全前也能折叠完整轮次）。
+        var recentGroup = viewModel.ConversationItems.OfType<TurnProcessGroupViewModel>()
+                                   .Single(item => item.Seq == 26);
+        Assert.Equal(2, recentGroup.ToolCallCount);
+        Assert.Equal(1, recentGroup.MessageCount);
+        Assert.Equal("2 次工具调用 · 1 条消息", recentGroup.SummaryText);
 
         // 逐页点击「加载更早」直到读全：每次前插一页（首条 Seq 前移），折叠状态随 HasMoreHistory 变化。
         var guard = 0;
@@ -329,6 +393,137 @@ public sealed class MainWindowViewModelTests
         Assert.True(answer.HasReasoning);
 
         await viewModel.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task SnapshotTailInterruptedBoundaryKeepsOpenTurnUnfoldedUntilRealEnd()
+    {
+        var sessionService = new SyntheticBoundarySessionService();
+        var backendService = new SimulatedBackendStatusService();
+        var viewModel      = new MainWindowViewModel(sessionService, backendService, new StaticWorkspaceService());
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.SelectedSession is not null);
+
+        // 中途 attach 到生成中的会话：快照尾部带 Host 合成的 interrupted 边界（seq 即 cursor，
+        // 持久日志中不存在）。该边界不得结算当前轮——条目保持逐项显示，无过程组。
+        await WaitUntilAsync(() => viewModel.ConversationItems.OfType<MessageItemViewModel>()
+                                            .Any(message => message.Content == "阶段性回复"));
+        Assert.DoesNotContain(viewModel.ConversationItems, item => item is TurnProcessGroupViewModel);
+
+        // 生成继续：新工具与真正的最终回复落地，随后真实的 turn/end 到达——此时才折叠，
+        // 且只折叠一次（合成边界若被结算会出现两个过程组/错误的最终回复）。
+        sessionService.PushLiveTail();
+        await WaitUntilAsync(() => viewModel.ConversationItems.OfType<MessageItemViewModel>()
+                                            .Any(message => message.Content == "真正的最终回复"));
+        sessionService.PushRealTurnEnd();
+        await WaitUntilAsync(() => viewModel.ConversationItems.OfType<TurnProcessGroupViewModel>().Any());
+
+        var group = viewModel.ConversationItems.OfType<TurnProcessGroupViewModel>().Single();
+        Assert.Equal(2, group.ToolCallCount);
+        Assert.Equal(2, group.MessageCount);
+        Assert.Contains(group.Process, item => item is ToolActivityItemViewModel { Name: "fs.read" });
+        var answer = viewModel.ConversationItems.OfType<MessageItemViewModel>()
+                              .Single(message => message.Content == "真正的最终回复");
+        Assert.Equal(7, answer.Seq);
+        Assert.False(viewModel.HasError);
+
+        await viewModel.DisposeAsync();
+    }
+
+    /// <summary>
+    ///     中途 attach 桩：快照窗口含未完结轮的条目，尾部是 Host 合成的 interrupted 边界；
+    ///     随后可推送该轮的真实收尾事件（工具、最终回复与 turn/end）。
+    /// </summary>
+    private sealed class SyntheticBoundarySessionService : ISessionService
+    {
+        private readonly SimulatedSessionService _inner = new();
+
+        private readonly Channel<SessionUpdate> _liveTail = Channel.CreateUnbounded<SessionUpdate>();
+
+        public event EventHandler? SessionsChanged
+        {
+            add => _inner.SessionsChanged += value;
+            remove => _inner.SessionsChanged -= value;
+        }
+
+        public Task<IReadOnlyList<SessionSummary>> GetSessionsAsync(CancellationToken cancellationToken = default)
+        {
+            return _inner.GetSessionsAsync(cancellationToken);
+        }
+
+        public Task<SessionSummary> CreateSessionAsync(CancellationToken cancellationToken = default)
+        {
+            return _inner.CreateSessionAsync(cancellationToken);
+        }
+
+        public Task<ModelCatalog> GetModelCatalogAsync(CancellationToken cancellationToken = default)
+        {
+            return _inner.GetModelCatalogAsync(cancellationToken);
+        }
+
+        public Task<ModelSelection> SelectModelAsync(
+            string sessionId, string provider, string model, CancellationToken cancellationToken = default)
+        {
+            return _inner.SelectModelAsync(sessionId, provider, model, cancellationToken);
+        }
+
+        public Task<IReadOnlyList<ConversationMessage>> GetMessagesAsync(
+            string sessionId, CancellationToken cancellationToken = default)
+        {
+            return _inner.GetMessagesAsync(sessionId, cancellationToken);
+        }
+
+        public Task<SessionHistoryPage> LoadOlderAsync(
+            string sessionId, long throughSeq, long beforeSeq, CancellationToken cancellationToken = default)
+        {
+            return _inner.LoadOlderAsync(sessionId, throughSeq, beforeSeq, cancellationToken);
+        }
+
+        public Task SendPromptAsync(
+            string sessionId, string requestId, string content, CancellationToken cancellationToken = default)
+        {
+            return _inner.SendPromptAsync(sessionId, requestId, content, cancellationToken);
+        }
+
+        public Task CancelAsync(string sessionId, CancellationToken cancellationToken = default)
+        {
+            return _inner.CancelAsync(sessionId, cancellationToken);
+        }
+
+        public async IAsyncEnumerable<SessionUpdate> FollowSessionAsync(
+            string sessionId, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            var now = DateTimeOffset.Now;
+            ConversationEntry[] entries =
+            [
+                new ConversationMessage(1, "attach-user", MessageRole.User, "中途 attach 的问题", now, 1),
+                new ConversationMessage(2, "attach-interim", MessageRole.Assistant, "先看快照形状。", now, 1),
+                new ToolActivity(3, "call-attach-1", "fs.read", "{}", ToolActivityStatus.Succeeded,
+                                 "读取结果", null, now, now.AddSeconds(1), 1),
+                new ConversationMessage(4, "attach-mid", MessageRole.Assistant, "阶段性回复", now, 1),
+                // Host 为开放轮合成的边界：interrupted、seq 即 cursor，持久日志中不存在。
+                new TurnBoundary(5, 1, now, "interrupted")
+            ];
+            yield return new SessionUpdate.Snapshot(entries, 5, 1, false, "中途 attach");
+            await foreach (var update in _liveTail.Reader.ReadAllAsync(cancellationToken)) yield return update;
+        }
+
+        public void PushLiveTail()
+        {
+            var now = DateTimeOffset.Now;
+            _liveTail.Writer.TryWrite(new SessionUpdate.ToolCallStarted(new ToolActivity(
+                                                                         6, "call-attach-2", "fs.read", "{}",
+                                                                         ToolActivityStatus.Running,
+                                                                         null, null, now, Turn : 1)));
+            _liveTail.Writer.TryWrite(new SessionUpdate.MessageAppended(new ConversationMessage(
+                                                                         7, "attach-final", MessageRole.Assistant,
+                                                                         "真正的最终回复", now, 1)));
+        }
+
+        public void PushRealTurnEnd()
+        {
+            _liveTail.Writer.TryWrite(new SessionUpdate.TurnEnded(1, 8, "completed"));
+        }
     }
 
     [Fact]

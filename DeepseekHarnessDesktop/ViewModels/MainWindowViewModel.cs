@@ -31,7 +31,13 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private string           _errorText    = string.Empty;
 
     private CancellationTokenSource? _followCancellation;
-    private bool                     _hasMoreHistory;
+
+    // follow 代际门闩：随 BeginFollow 递增；旧订阅循环在锁内校验代际后才应用更新，
+    // 防止被抢占的旧循环把上一会话的迟到更新写进新会话的状态。
+    private readonly Lock _followGate = new();
+
+    private int  _followEpoch;
+    private bool _hasMoreHistory;
 
     // 历史窗口状态：快照游标（throughSeq）、窗口首条事件 seq（beforeSeq）与是否还有更早历史。
     private long _historyThroughSeq;
@@ -238,7 +244,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 OnPropertyChanged(nameof(UsageValueText));
                 OnPropertyChanged(nameof(CacheHitValueText));
                 OnPropertyChanged(nameof(UsageDetailText));
-                OnPropertyChanged(nameof(HasUsageValues));
+                OnPropertyChanged(nameof(HasStatsData));
             }
         }
     }
@@ -253,6 +259,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             {
                 OnPropertyChanged(nameof(SpeedValueText));
                 OnPropertyChanged(nameof(StatsDetailText));
+                OnPropertyChanged(nameof(HasStatsData));
             }
         }
     }
@@ -304,8 +311,16 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             + $" · 工具耗时 {stats.ToolMs                                 / 1000:0.#}s"
             : null;
 
-    /// <summary>是否已有任何 usage 数据（控制悬停提示可用性）。</summary>
-    public bool HasUsageValues => UsageDetailText is not null;
+    /// <summary>
+    ///     统计条是否显示：对齐 WebUI StatsPills 的空会话口径——出现过至少一步生成
+    ///     或有任何计费 token 才显示。不能只判 Usage/Stats 非 null：冷会话的 follow
+    ///     快照会携带全 0 的投影 wire 视图，占位「—」不该在空对话露出。
+    /// </summary>
+    public bool HasStatsData =>
+        Stats is { Steps: > 0 }
+     || Usage is { } usage
+     && usage.UncachedInputTokens + usage.CacheReadTokens + usage.CacheWriteTokens
+      + usage.OutputTokens > 0;
 
     public bool IsSending
     {
@@ -684,6 +699,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private async Task FollowSelectedSessionAsync(SessionItemViewModel? session)
     {
         var cancellation = BeginFollow();
+        int epoch;
+        lock (_followGate) epoch = _followEpoch;
+
         if (session is null)
         {
             ConversationItems.Clear();
@@ -698,9 +716,14 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         {
             await foreach (var update in _sessionService.FollowSessionAsync(session.Id, cancellation.Token))
             {
-                if (cancellation.IsCancellationRequested || !ReferenceEquals(SelectedSession, session)) return;
+                lock (_followGate)
+                {
+                    if (cancellation.IsCancellationRequested || epoch != _followEpoch
+                                                             || !ReferenceEquals(SelectedSession, session))
+                        return;
 
-                ApplySessionUpdate(update);
+                    ApplySessionUpdate(update);
+                }
             }
         }
         catch (OperationCanceledException)
@@ -724,7 +747,14 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 ResetStreamingMessage();
                 ConversationItems.Clear();
                 _timelineEntries = [.. snapshot.Entries];
-                _assembly        = CreateAssembly(!snapshot.HasMore);
+                // 真实 Host 会在快照尾部为开放中的轮合成 interrupted 边界（seq 即 cursor，
+                // 持久日志中不存在）：丢弃它，让该轮保持开放，由后续真实 turn/end 收束；
+                // 否则中途 attach/重连会把生成中的轮提前折旧，且真实边界到达后会二次折叠。
+                if (_timelineEntries.Count > 0
+                 && _timelineEntries[^1] is TurnBoundary { Reason: "interrupted" })
+                    _timelineEntries.RemoveAt(_timelineEntries.Count - 1);
+
+                _assembly = CreateAssembly();
                 foreach (var entry in _timelineEntries) _assembly.Add(entry);
 
                 _historyThroughSeq = snapshot.Cursor;
@@ -742,8 +772,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 break;
 
             case SessionUpdate.TurnEnded ended :
-                _timelineEntries.Add(new TurnBoundary(ended.Seq, ended.Turn, DateTimeOffset.Now));
-                _assembly.Add(new TurnBoundary(ended.Seq, ended.Turn, DateTimeOffset.Now));
+                var boundary = new TurnBoundary(ended.Seq, ended.Turn, DateTimeOffset.Now, ended.Reason);
+                _timelineEntries.Add(boundary);
+                _assembly.Add(boundary);
                 break;
 
             case SessionUpdate.ToolCallStarted started :
@@ -849,20 +880,20 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
-    /// <summary>按当前折叠开关（历史是否已读全）从全量条目重建时间线。</summary>
+    /// <summary>从全量条目重建时间线；折叠资格逐轮判定（窗口内完整覆盖的轮次折叠）。</summary>
     private void RebuildTimeline()
     {
         ConversationItems.Clear();
-        _assembly = CreateAssembly(!HasMoreHistory);
+        _assembly = CreateAssembly();
         foreach (var entry in _timelineEntries) _assembly.Add(entry);
 
         // 重建会丢掉流式气泡；生成中重新挂回尾部，等待正式消息事件替换。
         if (_streamingMessage is not null) ConversationItems.Add(_streamingMessage);
     }
 
-    private TimelineAssembly CreateAssembly(bool allowFolding = false)
+    private TimelineAssembly CreateAssembly()
     {
-        return new TimelineAssembly(ConversationItems, allowFolding);
+        return new TimelineAssembly(ConversationItems);
     }
 
     private bool CanLoadOlder()
@@ -962,6 +993,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             previous.Dispose();
         }
 
+        // 代际门闩：新订阅开代。旧循环的「校验 + 应用」在同一把锁内原子进行，
+        // 代际不符即退出——否则旧会话的迟到更新（如 stats 整值）会在新会话基线
+        // 之后落盘，把新会话的统计串台成旧值且不再被修正。
+        lock (_followGate) _followEpoch++;
+
         return cancellation;
     }
 
@@ -1048,11 +1084,13 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     /// <summary>
     ///     把会话条目组装为时间线项目，折叠规则对齐参考 Web 客户端的 turn-process 投影：
     ///     轮内条目（中间助手消息、工具调用）先逐项显示；turn/end 到达后按「最后一轮步的
-    ///     有正文且不含工具调用的助手消息为最终回复」结算，最终回复存在且历史已读全时，
-    ///     其之前的过程条目折叠为一个 <see cref="TurnProcessGroupViewModel" />；否则保持逐项。
-    ///     快照、增量与翻页共用同一套规则。
+    ///     有正文且不含工具调用的助手消息为最终回复」结算，最终回复存在时其之前的过程条目
+    ///     折叠为一个 <see cref="TurnProcessGroupViewModel" />。快照、增量与翻页共用同一套规则。
+    ///     逐轮判定折叠资格：只有本轮起点（用户消息或上一轮边界）落在已加载窗口内时才折叠，
+    ///     被窗口截断的首轮保持逐项展示——否则中途 attach 长会话时，全程要手动翻到顶才能
+    ///     看到折叠形态（WebUI 实时会话的已加载窗口天然是全量，不存在此落差）。
     /// </summary>
-    private sealed class TimelineAssembly(ObservableCollection<ConversationItemViewModel> target, bool allowFolding)
+    private sealed class TimelineAssembly(ObservableCollection<ConversationItemViewModel> target)
     {
         private readonly ObservableCollection<ConversationItemViewModel> _target = target;
 
@@ -1066,8 +1104,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
         private long? _turn;
 
-        /// <summary>是否允许折叠（对应参考实现的 historyIncomplete：历史未读全时不折叠）。</summary>
-        public bool AllowFolding { get; } = allowFolding;
+        /// <summary>上一条目是否是轮次起点（用户消息或 turn/end 边界）；窗口首条目按截断处理（假）。</summary>
+        private bool _turnOpeningSeen;
+
+        /// <summary>本轮起点是否在已加载窗口内；在本轮首个条目到达时快照 <see cref="_turnOpeningSeen" />。</summary>
+        private bool _turnStartObserved;
 
         public void Add(ConversationEntry entry)
         {
@@ -1075,17 +1116,20 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             {
                 case TurnBoundary boundary :
                     if (_turn is { } openTurn && openTurn == boundary.Turn)
-                        CloseTurn(AllowFolding);
+                        CloseTurn(_turnStartObserved);
                     else if (_turn is not null)
                         // 轮次号不衔接（窗口裁剪等）：当前轮保守收尾，不折叠。
                         CloseTurn(false);
 
+                    // 边界收束上一轮，其后是新一轮的起点。
+                    _turnOpeningSeen = true;
                     return;
 
                 case ConversationMessage { Role: MessageRole.User } message :
                     // 用户消息开新一轮：上一轮未见 turn/end 时保守收尾，不折叠。
                     // 用户气泡不属于任何轮的过程条目，不进入轮内跟踪。
                     CloseTurn(false);
+                    _turnOpeningSeen = true;
                     _target.Add(new MessageItemViewModel(message));
                     return;
 
@@ -1097,6 +1141,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                     var reasoningItem = new MessageItemViewModel(message);
                     _turnEntries.Add(message);
                     Append(reasoningItem);
+                    _turnOpeningSeen = false;
                     return;
 
                 case ConversationMessage message when string.IsNullOrWhiteSpace(message.Content) :
@@ -1109,6 +1154,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                     var messageItem = new MessageItemViewModel(message);
                     _turnEntries.Add(message);
                     Append(messageItem);
+                    _turnOpeningSeen = false;
                     return;
 
                 case ToolActivity tool :
@@ -1117,6 +1163,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                     _toolsByCallId[tool.CallId] = (card, null);
                     _turnEntries.Add(tool);
                     Append(card);
+                    _turnOpeningSeen = false;
                     return;
 
                 default :
@@ -1138,13 +1185,17 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
         private void OpenTurn(long? turn)
         {
-            if (_turnItems.Count == 0) _turn = turn;
+            if (_turnItems.Count == 0)
+            {
+                _turn              = turn;
+                _turnStartObserved = _turnOpeningSeen;
+            }
         }
 
         /// <summary>
         ///     结算当前轮：最终回复是轮内最后一条助手消息且它有正文（思考不算正文）、
-        ///     不含工具调用块；存在且允许折叠时，其余过程条目收入过程组，最终回复保持独立气泡。
-        ///     被打断的轮次若无正文（只有思考）则不构成最终回复，整轮保持逐项展示。
+        ///     不含工具调用块；存在且轮起点在窗口内时，其余过程条目收入过程组，最终回复保持
+        ///     独立气泡。被窗口截断的轮次（起点未观察到）与被打断无正文的轮次保持逐项展示。
         /// </summary>
         private void CloseTurn(bool foldAllowed)
         {
