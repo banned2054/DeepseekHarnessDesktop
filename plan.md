@@ -1,4 +1,4 @@
-# DeepseekHarnessDesktop 开发计划
+# DshDesktop 开发计划
 
 更新日期：2026-09-19。
 
@@ -22,7 +22,7 @@
 
 ## 现有源码依据
 
-- 当前客户端入口：`DeepseekHarnessDesktop/Program.cs`、`App.axaml.cs`、`MainWindow.axaml`。
+- 当前客户端入口：`DshDesktop/Program.cs`、`App.axaml.cs`、`MainWindow.axaml`。
 - 本机参考源码：`C:/Code/JavaScript/deepseek-harness`，仅作为分析参考，不是本项目运行时硬编码路径。
 - `apps/desktop/src/host-process.ts` 使用 Node IPC 启动和管理 Host。
 - `apps/desktop-host/src/index.ts` 通过 `runProfile()` 启动后端，使用 `process.send` 报告就绪、失败和关闭。
@@ -33,11 +33,11 @@
 
 | 项目 | 职责 |
 | --- | --- |
-| `DeepseekHarnessDesktop` | 应用入口、Views、ViewModels、界面模型、服务组装 |
-| `DeepseekHarnessDesktop.Core` | 应用模型和服务接口，不依赖 UI 或具体平台 |
-| `DeepseekHarnessDesktop.Harness` | 认证、协议 DTO、请求、事件和应用模型转换 |
-| `DeepseekHarnessDesktop.Infrastructure` | 后端进程、本地设置、日志与系统能力 |
-| `DeepseekHarnessDesktop.Tests` | 与阶段实现配套的关键行为测试 |
+| `DshDesktop` | 应用入口、Views、ViewModels、界面模型、服务组装 |
+| `DshDesktop.Core` | 应用模型和服务接口，不依赖 UI 或具体平台 |
+| `DshDesktop.Harness` | 认证、协议 DTO、请求、事件和应用模型转换 |
+| `DshDesktop.Infrastructure` | 后端进程、本地设置、日志与系统能力 |
+| `DshDesktop.Tests` | 与阶段实现配套的关键行为测试 |
 
 依赖方向：Desktop 引用 Core、Harness、Infrastructure；Harness 和 Infrastructure 仅引用 Core，彼此不引用。
 
@@ -46,24 +46,24 @@
 示例分类：
 
 ```text
-DeepseekHarnessDesktop/
+DshDesktop/
   Views/{Shell,Sessions,Settings}/
   ViewModels/{Shell,Sessions,Settings}/
   Models/
   Services/
   Assets/
 
-DeepseekHarnessDesktop.Core/
+DshDesktop.Core/
   Models/{Sessions,Messages,Workspaces}/
   Services/
   Exceptions/
 
-DeepseekHarnessDesktop.Harness/
+DshDesktop.Harness/
   Models/{Requests,Responses,Events}/
   Services/{Connection,Sessions}/
   Utils/
 
-DeepseekHarnessDesktop.Infrastructure/
+DshDesktop.Infrastructure/
   Models/
   Services/{Backend,Settings,Logging,Platform}/
 ```
@@ -200,9 +200,9 @@ Host 适配层候选方案：独立 Node launcher 通过 Node IPC 管理原 Host
 
 阶段 1 已完成的验证记录：
 
-- `dotnet build DeepseekHarnessDesktop.slnx`：通过，0 个警告，0 个错误。
-- `dotnet test DeepseekHarnessDesktop.Tests/DeepseekHarnessDesktop.Tests.csproj --no-restore`：通过，3 个测试全部通过。
-- `dotnet publish DeepseekHarnessDesktop/DeepseekHarnessDesktop.csproj -c Release -r win-x64 --self-contained true`：通过，生成 Windows x64 Native AOT 发布目录。
+- `dotnet build DshDesktop.slnx`：通过，0 个警告，0 个错误。
+- `dotnet test DshDesktop.Tests/DshDesktop.Tests.csproj --no-restore`：通过，3 个测试全部通过。
+- `dotnet publish DshDesktop/DshDesktop.csproj -c Release -r win-x64 --self-contained true`：通过，生成 Windows x64 Native AOT 发布目录。
 - AOT 可执行文件已启动，进程保持响应，窗口标题为 `Deepseek Harness`；已在验证后关闭。
 - macOS/Linux 构建与启动：未验证；真实 Node Harness 协议与后端接入：未验证。
 - 窗口级自动化交互：当前桌面自动化连接未暴露 Avalonia 窗口的可操作绑定，因此未将其记录为已验证。
@@ -210,10 +210,10 @@ Host 适配层候选方案：独立 Node launcher 通过 Node IPC 管理原 Host
 阶段 2 已完成的验证记录（Windows 10 x64，2026-09-20）：
 
 - 参考仓库构建：`pnpm install --frozen-lockfile` 与 `DSH_CLIENT_COMMIT_HASH=0000000 pnpm run build` 通过（无 git 元数据需显式提供 commit 占位）。
-- `dotnet build DeepseekHarnessDesktop.slnx`：通过，0 警告，0 错误。
-- `dotnet test DeepseekHarnessDesktop.Tests/DeepseekHarnessDesktop.Tests.csproj`：20 个测试全部通过（协议信封/帧解析、launcher 控制协议三场景、ViewModel 流式行为、模拟服务）。
+- `dotnet build DshDesktop.slnx`：通过，0 警告，0 错误。
+- `dotnet test DshDesktop.Tests/DshDesktop.Tests.csproj`：20 个测试全部通过（协议信封/帧解析、launcher 控制协议三场景、ViewModel 流式行为、模拟服务）。
 - `DSH_E2E_RUNTIME_DIR=<开发 runtime> dotnet test --filter RealBackendE2eTests`：对真实 Host 通过——独立 Node 启动、就绪握手、令牌认证、`session/list`（`_request` 参数）、`session/create`、`session/prompt`、follow 快照与用户消息事件、取消调用、消息回读、优雅关闭。
-- `dotnet publish DeepseekHarnessDesktop/DeepseekHarnessDesktop.csproj -c Release -r win-x64 --self-contained true`：Native AOT 发布通过，0 警告 0 错误，`launcher.mjs` 随包输出。
+- `dotnet publish DshDesktop/DshDesktop.csproj -c Release -r win-x64 --self-contained true`：Native AOT 发布通过，0 警告 0 错误，`launcher.mjs` 随包输出。
 - AOT 产物以真实模式启动并成功拉起真实 Host；随后强杀应用进程，Job Object 回收 launcher 与 Host，确认无本应用遗留进程。
 - 智谱 GLM 提供方接入（2026-09-20，用户授权）：DSH_HOME 默认改为与正式 dsh 共享（`~/.dsh`），新增 `session/selectModel`/`session/modelCatalog` 与 `DSH_DESKTOP_MODEL` 自动选型；`DSH_E2E_REAL_HOME=1 dotnet test --filter RealModelConversationTests` 对真实 home 通过——模型目录列出 `glm`（默认为 `deepseek-official/deepseek-flash`），选型回显 `glm/glm-5.3-flash`。
 - 未验证：带 `GLM_API_KEY` 的完整模型流式往返（本机各环境作用域均未设置该变量，等用户设置后运行同一测试补齐）；macOS/Linux 全部项；窗口级自动化交互仍不可用。
@@ -226,7 +226,7 @@ Host 适配层候选方案：独立 Node launcher 通过 Node IPC 管理原 Host
 - 会话列表刷新改为按 id 就地更新：选中实例不被替换、不重开订阅，生成中的流式气泡不被新快照清除（新增单元测试 `SessionListRefreshKeepsSelectedInstanceAndStreamingBubble`、`AbandonedStreamMarksBubbleInterruptedInsteadOfHanging` 覆盖）。
 - 测试重整：拆分 `RealModelConfigurationTests`（目录/选型/凭据状态，不调用模型）与 `RealModelConversationTests`（`DSH_E2E_REAL_MODEL=1` 显式启用，启用后凭据未识别即失败；断言流式增量非空、最终回复非空、取消的落盘结算）；E2E 改用 `SkippableFact` 显式报告跳过；修复跨线程读写普通 `List` 的竞态，订阅任务异常不再被静默吞掉。取消前置为“尝试已运行”而非“文本增量已出现”——GLM 混合推理模型长文任务可能先进入只产出 `reasoning-delta` 的思考阶段（应用层不透传）。
 - 窗口实测修正（2026-09-20，用户人工验收发现）：注入上下文气泡——后端以 user 角色注入的 runtime-context 快照与技能目录（`source.kind` 为 `plugin`/`skill-catalog` 等，非 `'user'`）不再显示为用户气泡，快照与增量路径统一过滤；滚动截断——`ScrollViewer` 的 `Padding` 改由内部 `Border` 承担（Avalonia 12.1.0 中 presenter 的 Padding 不计入滚动 extent，挂在 ScrollViewer 上时手动拉到底仍截掉一段，即“最后一条回信底部不可达”的根因），`HorizontalScrollBarVisibility` 显式 Disabled，消息模板不变；另补挂 `ScrollChanged` 按增高前 extent 维持贴底，覆盖流式文本增高与新气泡布局晚于滚动命令的时机问题。
-- 验证（Windows 10 x64）：`dotnet build DeepseekHarnessDesktop.slnx` 0 警告 0 错误；`DSH_E2E_RUNTIME_DIR=<开发 runtime> DSH_E2E_REAL_HOME=1 dotnet test`：22 通过、1 明确跳过（真实模型测试，待授权启用；隔离 home 的 `RealBackendE2eTests` 与真实 home 的 `RealModelConfigurationTests` 均通过）；`dotnet publish -c Release -r win-x64 --self-contained true` Native AOT 发布 0 警告 0 错误。
+- 验证（Windows 10 x64）：`dotnet build DshDesktop.slnx` 0 警告 0 错误；`DSH_E2E_RUNTIME_DIR=<开发 runtime> DSH_E2E_REAL_HOME=1 dotnet test`：22 通过、1 明确跳过（真实模型测试，待授权启用；隔离 home 的 `RealBackendE2eTests` 与真实 home 的 `RealModelConfigurationTests` 均通过）；`dotnet publish -c Release -r win-x64 --self-contained true` Native AOT 发布 0 警告 0 错误。
 - 真实模型往返验收（2026-09-20，用户授权运行）：`DSH_E2E_REAL_MODEL=1` 下 `RealModelConversationTests` 通过（31s）——GLM glm-5.3-flash 流式文本增量非空、62 字符完整回复、`Committed` 结算；生成中取消后 `Committed/assistant/message` 结算并收到带 `[已中断]` 标注的部分回复（“# 蔚蓝星球”），取消后 `session/list` 仍可用。首轮运行（用户执行）曾因误设“取消 ⇒ Abandoned”断言失败，随即按协议语义修正；同轮还发现并修复 `credentials/describe` 的 refs 参数形状（数组而非请求对象）。
 
 后端冷启动性能修正（2026-09-20，用户与 Codex 讨论定位后实施）：
@@ -234,13 +234,13 @@ Host 适配层候选方案：独立 Node launcher 通过 Node IPC 管理原 Host
 - 根因：`DSH_DESKTOP_RESOLUTION` 默认 `link`——该模式每次启动都要在 profile 目录维护约 625 个 module fallback junction（`healIsolatedProfileModuleFallback`），冷启动实测约 30.9s、热启动约 15.2s；而 DSH 的 Electron 正式桌面版打包后使用 `runtime`（进程内解析，`main.ts` 中 `development ? 'link' : 'runtime'`），仅开发态用 `link`。`runtime` 模式冷启动约 8.9s。
 - 修改：`NodeHostOptions.ResolutionMode` 默认值与 `DesktopBackendConfiguration` 的 `DSH_DESKTOP_RESOLUTION` 回退值均由 `link` 改为 `runtime`；环境变量仍可显式指定回 `link`。launcher 与 DSH 侧无需改动。
 - 本机复测（应用真实 profile，launcher 到 ready 计时）：`link` 8.4s/9.2s，`runtime` 6.4s/7.3s，两种模式优雅关闭均 clean；顺带清理了上轮诊断遗留的测量进程树（launcher 依赖父进程关闭 stdin 才退出，独立测量脚本需主动收尾）。
-- 验证（Windows 10 x64）：`dotnet build DeepseekHarnessDesktop.slnx` 0 警告 0 错误；`DSH_E2E_RUNTIME_DIR=<开发 runtime> DSH_E2E_REAL_HOME=1 dotnet test`：23 通过、1 明确跳过（真实模型测试，随新默认 `runtime` 模式跑通含优雅关闭的全链路）。
+- 验证（Windows 10 x64）：`dotnet build DshDesktop.slnx` 0 警告 0 错误；`DSH_E2E_RUNTIME_DIR=<开发 runtime> DSH_E2E_REAL_HOME=1 dotnet test`：23 通过、1 明确跳过（真实模型测试，随新默认 `runtime` 模式跑通含优雅关闭的全链路）。
 - 未验证：应用窗口内从启动到会话列表出现的端到端耗时（Host 之外仍有认证、WebSocket、`$events`、`session/list` 串行段，如需进一步压缩属后续范围）；macOS/Linux。
 
 阶段 3 助手气泡 Markdown 渲染验证记录（Windows 10 x64，2026-09-20）：
 
 - 依赖核验：LiveMarkdown.Avalonia 2.4.3 依赖 Avalonia ≥ 12.0（本项目 12.1.0）、Markdig、TextMateSharp；源码检索无反射动态代码。
-- `dotnet build DeepseekHarnessDesktop.slnx`：通过，0 警告 0 错误。
+- `dotnet build DshDesktop.slnx`：通过，0 警告 0 错误。
 - `dotnet test`：21 通过、3 按设计跳过（真实后端/真实模型 E2E 需环境变量启用）；连续 8 次运行无抖动。期间发现并修复既有用例 `StreamingUpdatesAppendAssistantTextAndCommitReplacesBubble` 的竞态（等待条件过早命中流式中间态，约 1/4 概率失败），改为等待正式消息替换流式气泡的终态。
 - `dotnet publish -c Release -r win-x64 --self-contained true`：Native AOT 发布通过，强制完整 ILC 重跑，0 警告 0 错误。
 - AOT 产物启动冒烟：模拟模式进程稳定后正常退出；随后以真实模式（`.backend-runtime` + 共享 `~/.dsh`，只读加载）启动，窗口截图确认助手气泡 Markdown 生效——真实 GLM 历史回复中 `**GLM**`、`**Z.ai**` 等加粗正确渲染（无裸露星号）、emoji 正常、无空气泡；强杀应用后无遗留 launcher/Host 进程（Job Object 回收）。
@@ -251,7 +251,7 @@ Host 适配层候选方案：独立 Node launcher 通过 Node IPC 管理原 Host
 
 - 协议梳理（对照参考实现 `packages/api/session-controller/src/history.ts`、`ui-chat/conversation-nodes/tool.ts`、`core/session/src/types.ts`）：快照按消息对齐裁剪（默认最近 50 条消息，工具事件经 `sourceEventSeqs` 与来源消息同组），`hasMore` 表示更早历史；`session/page`（形参名 `request`）以 `throughSeq`（快照游标）+ `beforeSeq`（当前窗口首条 seq，排除性上界）向后翻页，返回同形 records + hasMore；`tool/call` 携带 `callId/name/arguments`（原始 JSON 文本），`tool/result` 的 `message.content[0]` 为 tool-result 块（内层 content 文本块 + `isError`），`data.error` 为错误身份（`name/code/reason`）；孤儿 `tool/call`（崩溃中断）在会话恢复时由后端 repair 合成 error result。参考 Web 客户端翻页页大小同为 50。
 - 实现：Core 模型引入 `ConversationEntry` 基类（`ConversationMessage` 继承）与 `ToolActivity`（状态机 Running/Succeeded/Failed）；`ISessionService.LoadOlderAsync` 契约；Harness 层 `session/page` DTO + `MapEntries` 折叠映射（快照与增量同源）+ 快照携带 `WindowStartSeq/HasMore`；ViewModel 维护历史窗口状态、`LoadOlderCommand`（整页被注入上下文过滤时最多连翻 4 页）；工具卡片模板（多类型 DataTemplates 按类型匹配）；窗口 code-behind 滚动到顶自动触发 + 前插内容滚动锚定补偿 + 会话切换重置（Reset）导致的偏移归零不误触发（该问题由窗口截图发现并修复）。
-- `dotnet build DeepseekHarnessDesktop.slnx`：通过，0 警告 0 错误。
+- `dotnet build DshDesktop.slnx`：通过，0 警告 0 错误。
 - `dotnet test`：29 通过、3 明确跳过（真实后端/模型 E2E），连续 3 次运行无抖动。新增用例：page 请求线形与响应解析折叠、失败工具错误映射、孤儿 result 独立成卡、翻页前插与耗尽、切换会话重置窗口、工具卡片落定与失败态。
 - `DSH_E2E_RUNTIME_DIR=<开发 runtime> dotnet test`：对真实 Host 通过（含新增 `session/page` 真实往返：新会话空页 + `hasMore=false`）。
 - `dotnet publish -c Release -r win-x64 --self-contained true`：清理后完整 ILC 重跑，0 警告 0 错误。
@@ -262,7 +262,7 @@ Host 适配层候选方案：独立 Node launcher 通过 Node IPC 管理原 Host
 
 - 背景：真实 dsh 会话复核暴露两类问题——纯工具调用轮的 `assistant/message`（`ExtractText` 仅拼 text 块得到空串）渲染为只有「DeepSeek + 时间」表头的空气泡；工具卡片逐张平铺噪音大。对齐 Web 端「4 次工具调用 · 1 条消息 ›」的折叠交互，并按用户决策：运行中展开、落定收起；助手回复不用气泡底色。
 - 实现：新增 `ToolGroupItemViewModel`（工具数/隐藏消息数/失败数摘要、展开态、翻页边界 `Absorb` 合并）；`MainWindowViewModel.TimelineAssembly` 统一组装快照/增量/翻页三条路径（可见消息结束分组；无正文助手消息只计数不显示；页边界相邻分组合并、页尾积压计数并入紧邻分组）；工具卡片模板迁入 `Window.Resources` 供分组内 `ItemsControl` 复用；`assistant-bubble` 背景改透明并删除 `AssistantBubbleBrush`；模拟演示会话改为「用户消息 → 空助手提交 → fs.read + fs.edit → 总结」形态，新增 `BeginToolActivity`/`SettleToolActivity`/`PushCommittedAssistantMessage` 测试辅助。
-- `dotnet build DeepseekHarnessDesktop.slnx`：通过，0 警告 0 错误。
+- `dotnet build DshDesktop.slnx`：通过，0 警告 0 错误。
 - `dotnet test`：31 通过、3 明确跳过（真实后端/模型 E2E），连续 3 次运行无抖动。新增用例：无正文助手消息并入分组摘要且不产生气泡、运行中展开/部分落定保持展开/全部落定收起、用户消息后另起分组、翻页边界分组合并与积压计数并入（翻到底 12 项的 seq 序列断言）。
 - `dotnet publish -c Release -r win-x64 --self-contained true`：通过，0 警告 0 错误。
 - 窗口截图验收（PrintWindow + 模拟点击，模拟模式「长会话翻页」）：收起态确认「2 次工具调用 · 1 条消息 · 1 失败 ›」单行摘要、无空气泡、助手消息无气泡底色、用户气泡与「↑ 向上滚动加载更早消息」提示正常；点击摘要行展开后确认两枚工具卡片（fs.read 失败红点、fs.edit 成功绿点、状态/时间/详情按钮、箭头转向下）。
@@ -272,7 +272,7 @@ Host 适配层候选方案：独立 Node launcher 通过 Node IPC 管理原 Host
 
 - 背景与规则来源：桌面端此前把「先重读当前文件，再做定点替换。」这类有正文的中间助手消息显示为独立气泡（并与官方网页端截图对比确认）。规则取自参考实现 `packages/client/ui-chat/src/client/conversation-nodes/turn-process.ts`（`latestAnswer`/`processSpec`）、`ChatNodeSeat.tsx`（`processWindowReady` 含 `historyIncomplete`）与 `ui-chat/src/client/locale.ts`（摘要文案）。协议侧确认：`assistant/message`、`tool/call`、`tool/result` 的 `data.turn/step` 与持久化事件 `turn/end`（`core/session/src/types.ts`）即"哪些是过程、哪些是最终回复"的判定信号；assistant 内容块 `tool-call` 类型字符串经 `event-projection.ts` 核实。
 - 实现：`WireEventJson` 新增 `TryGetTurnStep`/`TryGetTurnEnd`/`HasToolCallBlocks`；Core 模型 `ConversationMessage`/`ToolActivity` 增加 `Turn` 与 `HasToolCalls`，新增 `TurnBoundary` 条目与 `SessionUpdate.TurnEnded`；`MapEntries`/`FollowSessionAsync` 透传轮次并产出边界；`TimelineAssembly` 重写为按 turn 组装（轮内逐项渲染，`turn/end` 后结算最终回复并折叠为 `TurnProcessGroupViewModel` 过程组；历史未读全不折叠，翻页改为全量条目重建、删除页边界合并逻辑）；模拟演示数据对齐真实形态（turn 标注 + turn/end，每轮「用户 → 中间说明 → fs.read + fs.edit → 总结 → turn/end」）；`ToolGroupItemViewModel` 删除。
-- `dotnet build DeepseekHarnessDesktop.slnx`：通过，0 警告 0 错误。
+- `dotnet build DshDesktop.slnx`：通过，0 警告 0 错误。
 - `dotnet test`：34 通过、3 明确跳过（真实后端/模型 E2E 需环境变量启用）。新增用例：turn/end 映射与轮次透传、tool-call 块识别、turn/end 后折叠过程组并保留最终回复、无最终回复的轮次不折叠、生成中逐项显示与就地落定、翻页到底后整体折叠（12 项 seq 序列断言）。期间修复两处实现缺陷：折叠后重放顺序（过程组应在最终回复之前）与 `Enumerable.Append` 误用（应为 `Add`，导致折叠后条目丢失）。
 - 模拟模式启动冒烟：`dotnet run --no-build` 启动 12s 无异常输出。
 - 未验证：真实会话内 turn 折叠的窗口内人工交互（模拟模式已覆盖组装逻辑，真实会话待用户复核）；Native AOT 产物未随本轮重跑（无新增反射依赖，上次发布记录仍有效）；macOS/Linux。
@@ -281,7 +281,7 @@ Host 适配层候选方案：独立 Node launcher 通过 Node IPC 管理原 Host
 
 - 背景（用户对照 Web 端提出三点）：滚动到顶自动加载不丝滑且偶发漏触发，应改为 Web 端的「加载更早」手动按钮；打断轮次（无可展示正文）不应折叠而其后正常轮次应折叠；工具调用之间的思考（reasoning）被桌面端丢弃（`ExtractText` 仅拼 text 块）。规则核对自参考实现：`ReasoningRow.tsx`（思考行交互）、`assistant-content.ts` 的 `hasAssistantReplyContent`（reasoning 不算回复正文）、`turn-process.ts` 的 `latestAnswer`（只取最后一个 step 的消息，无 reply 内容或含 tool-call 则整轮不折叠）、`ChatView.tsx`（`chat.loadOlder` 按钮分页）。
 - 实现：Core `ConversationMessage` 增加 `Step`/`Reasoning`/`IsInterrupted`；`WireEventJson.ExtractReasoning`（reasoning 块拼接）；`ToConversationMessage` 统一映射（快照/增量/`MapMessages` 同源），中断不再拼入正文；`TimelineAssembly`：纯思考消息作为轮内过程条目（随组折叠、展开显示思考行），`FindAnswer` 收紧为轮内最后一条助手消息判定；`TurnProcessGroupViewModel.MessageCount` 只计有正文条目；`MessageItemViewModel` 增加思考行（`ReasoningSummary` 首行摘要 + 展开全文）与独立 `IsInterrupted` 角标；`MainWindow.axaml` 助手气泡渲染思考行与角标，时间线顶端改为「加载更早」按钮（`LoadOlderText` 加载中切换文案），`MainWindow.axaml.cs` 删除滚动到顶自动触发（保留前插锚定与贴底跟随）；模拟数据每轮补两段思考与带思考的总结，`PushCommittedAssistantMessage` 支持 reasoning/isInterrupted。
-- `dotnet build DeepseekHarnessDesktop.slnx`：通过，0 警告 0 错误。
+- `dotnet build DshDesktop.slnx`：通过，0 警告 0 错误。
 - `dotnet test`：35 通过、3 明确跳过（真实后端/模型 E2E 需环境变量启用）。更新用例：翻页到底折叠（12 项 seq 序列、组内两段思考、总结带思考行）、流式中断标注改断言 `IsInterrupted`、轮次折叠升级为含思考真实形态；新增用例：打断轮次（reasoning-only + interrupted + turn/end）整轮不折叠且其后正常轮次照常折叠；协议测试补 `ExtractReasoning` 断言。
 - 窗口截图验收（PrintWindow + 模拟点击，模拟模式「长会话翻页」）：首屏确认「加载更早」按钮、两条思考行（摘要 + 箭头）与工具卡片渲染正常；连续点击按钮翻到顶后按钮消失、4 轮各折叠为「用户气泡 + 『2 次工具调用 · 1 条消息 ›』过程组 + 带思考行的回答」；点击摘要行展开后组内按时间线显示思考 → 中间说明 → fs.read → 思考 → fs.edit。
 - 未验证：真实会话（含 reasoning 的 GLM 历史）的窗口内人工复核；流式生成中思考的实时展示（当前流式仅 text 增量，思考随提交消息事件到达后出现）；Native AOT 产物未随本轮重跑（无新增反射依赖，上次发布记录仍有效）；macOS/Linux。
@@ -291,18 +291,18 @@ Host 适配层候选方案：独立 Node launcher 通过 Node IPC 管理原 Host
 - 背景（用户提出）：会话列表此前仅按时间单列表排列，参考 Web 客户端提供「按工作区 / 按工作区树 / 单列表」视图下拉。规则核对自参考实现 `ui-workspace` 包：`tree.ts` 的 `groupByWorkspace`（工作区记账归属、未分组兜底、空组显示）、`WorkspaceBrowser.tsx` 的视图菜单与 `stores.ts` 默认 `groupBy: 'workspace'`、`orderBy: 'updated'`；线协议为 `workspace/follow` 状态流（无对应一元 list 方法），帧形对照 `workspace-controller/src/types.ts`（baseline/upsert/remove/order/archived，`WorkspaceView` 携带 `sessionIds` 记账）。「按工作区树」嵌套与手动排序（insertSessionBefore）未纳入本轮。
 - 实现：Core 新增 `WorkspaceSummary` 与 `IWorkspaceService`（投影消费契约，首次调用可能为空、事件驱动更新）；Harness 新增 `WorkspaceFollowFrame` 手动解析与 `HarnessWorkspaceService`（baseline 整体替换、upsert 新行插头部且旧投影不覆盖新、order 按给出的顺序重排，Baseline 无条件通知以区分「基线未到达」与「确无工作区」；业务终态如后端无该命名空间时保持投影不再重试）；`HarnessConnection` 流泵泛化为 session/workspace 复用同一重连语义；ViewModel `SessionRows` 行投影（组头行 + 会话行混排，默认按工作区、组内 updatedAt 降序、空组显示、未分组仅非空时出现、收起状态按组键保留、`IsCurrent` 驱动行高亮）；侧栏 ComboBox 切换 + 自绘 Button 行模板（hover/选中高亮、分组行不可选）；模拟模式登记两个演示工作区（含一个空组）。
 - 外部诊断修复（2026-09-21，用户以 Codex 交叉诊断后授权修复）：① 自定义 Button 模板的 `ContentPresenter` 未绑定 Content/ContentTemplate，行内文字整体不显示（截图只剩固定尺寸元素）——显式补 `TemplateBinding` 后修复；② `RefreshSessionsAsync` 在「选中会话仍存在」分支提前 return，跳过行投影重建，后台新增/移除会话不刷新列表——改为该分支不 return、统一走末尾重建，并补回归测试。
-- `dotnet build DeepseekHarnessDesktop.slnx`：通过，0 警告 0 错误。
+- `dotnet build DshDesktop.slnx`：通过，0 警告 0 错误。
 - `dotnet test`：44 通过、3 按设计跳过（真实后端/模型 E2E 需环境变量启用）。新增用例：workspace/follow 帧解析（baseline 字段、upsert/remove/order、archived 帧解析为 null）、投影状态机（原位替换、旧不盖新、新行插头、order 重排未知排尾）、默认分组视图与高亮、模式切换投影形状（组序/组内排序/空组/未分组）、分组收起与跨模式保持、新建会话入未分组且选中保持、工作区事件驱动重组、后台新增会话时选中不变仍重建行投影（回归）。
 - `DSH_E2E_RUNTIME_DIR=<开发 runtime> dotnet test --filter RealBackendE2eTests`：对真实 Host 通过（含新增 `workspace/follow` 真实往返：订阅建立、基线到达、解析成功）。
 - `dotnet publish -c Release -r win-x64 --self-contained true`：Native AOT 发布通过，0 警告 0 错误。
-- 窗口截图验收（PrintWindow 定向截取）：修复前暴露行内容不渲染问题（见上）；修复后模拟模式确认「示例工作区（2 个会话，选中高亮）/ 文档整理（暂无会话）/ 未分组（2 个会话）」分组渲染、下拉框「按工作区」；真实模式（`.backend-runtime` + 共享 `~/.dsh`）确认真实工作区分组（DeepseekHarnessDesktop 等多个组）与真实会话归属、选中高亮、「Harness 后端已连接」；应用退出后无本应用遗留 launcher/Host 进程（Job Object 回收；系统中其他 node 进程经命令行核验均属用户自开的正式 dsh web 版与 Codex 环境）。
+- 窗口截图验收（PrintWindow 定向截取）：修复前暴露行内容不渲染问题（见上）；修复后模拟模式确认「示例工作区（2 个会话，选中高亮）/ 文档整理（暂无会话）/ 未分组（2 个会话）」分组渲染、下拉框「按工作区」；真实模式（`.backend-runtime` + 共享 `~/.dsh`）确认真实工作区分组（DshDesktop 等多个组）与真实会话归属、选中高亮、「Harness 后端已连接」；应用退出后无本应用遗留 launcher/Host 进程（Job Object 回收；系统中其他 node 进程经命令行核验均属用户自开的正式 dsh web 版与 Codex 环境）。
 - 未验证：视图下拉切换与分组展开/收起的窗口内人工点击交互（截图仅覆盖静态渲染，投影与状态逻辑由单测覆盖）；「按工作区树」模式与手动排序；视图偏好持久化（阶段 4）；macOS/Linux。
 
 悬浮输入面板改造验证记录（Windows 10 x64，2026-09-21）：
 
 - 背景（用户对照 WebUI 提出，与 Codex 讨论方案后按第一阶段执行）：底部输入区原为独立 `Grid.Row`，与聊天区割裂；方案确认附件/权限/审批/统计等协议未接入的能力只做视觉占位，不混入纯布局改造。
 - 实现：`MainWindow.axaml` 右侧改两行布局，输入面板与消息滚动区同格叠放（`ZIndex` + 底部对齐）悬浮于消息之上；新增圆角面板、左侧工具栏（附件禁用占位）、右侧模型区域（当时为「模型 —」占位）、圆形发送/停止按钮（生成中切换，命令仍为原 `SendMessageCommand`/`CancelCommand`）与底部统计栏（一律 `—`）；`MainWindow.axaml.cs` 随面板实际高度同步滚动内容底部留白，滚到底时最后一条消息不被面板遮挡；`App.axaml` 深/浅主题各新增 `ComposerSendHoverBrush`（发送悬停），窗口内不写死颜色。
-- `dotnet build DeepseekHarnessDesktop.slnx`：通过，0 警告 0 错误；`dotnet test`：44 通过、3 按设计跳过。
+- `dotnet build DshDesktop.slnx`：通过，0 警告 0 错误；`dotnet test`：44 通过、3 按设计跳过。
 - 窗口截图验收（PrintWindow 定向截取 + SendKeys 交互）：悬浮圆角面板四周透出聊天背景；多行输入后面板增高、无遮挡错位；Enter 发送后草稿清空、用户气泡完整可见；左 + 按钮、模型占位、统计栏渲染正常。
 - 未验证：生成中「停止」按钮形态——模拟后端不置 Running（声明式绑定，编译期验证）；真实后端下的实际观感。
 
@@ -311,7 +311,7 @@ Host 适配层候选方案：独立 Node launcher 通过 Node IPC 管理原 Host
 - 背景：模型协议基础（`session/modelCatalog`、`session/selectModel`、`DSH_DESKTOP_MODEL` 自动选型）已存在但未接入 UI（Codex 交叉分析确认需补 Core 接口、ViewModel 状态与服务调用）。规则核对自参考实现：`session-controller/src/catalog.ts`（目录 `groups/failures` 形态，空目录组剔除）、`model-selection-projection.ts`（`modelSelection` 投影 `{lastUsed, next}`，`next = pending ?? lastUsed` 即下一次请求的选型；选型经 `model/selection` 持久化事件回声）。
 - 实现：Core 新增 `ModelSelection`/`ModelCatalog`（`Groups`/`Failures`，reasoning 档位暂无消费方不解释）、`ISessionService.GetModelCatalogAsync`/`SelectModelAsync` 契约、`SessionUpdate.Snapshot.CurrentModel` 与新 `ModelSelected` 更新；Harness 目录 wire 扩展 `groups/failures` 并映射为应用模型（空模型组剔除），follow 快照解析 `modelSelection` 投影（next 优先、回退 lastUsed、未选型为 null），`model/selection` 事件解析为 `ModelSelected`；模拟服务提供双提供方目录、按会话记账选型并经同一回声路径生效；ViewModel 目录于初始化与后端重连时加载（失败不阻塞会话列表），`CurrentModel` 以 follow 流为权威，`SelectedModelOption` 改动即发起选型（与生效值相同/在途/失败时回退显示），当前选型不在目录时补占位项，无会话或断连时下拉禁用；XAML 悬浮面板右列以 ComboBox 替换占位徽标。
 - 期间修复：`SelectedSession` setter 原为先启动订阅再清空选型，模拟实现的快照可能内联到达后被清空——改为先清空再订阅（单测稳定复现并回归）。
-- `dotnet build DeepseekHarnessDesktop.slnx`：通过，0 警告 0 错误。
+- `dotnet build DshDesktop.slnx`：通过，0 警告 0 错误。
 - `dotnet test`：52 通过、3 按设计跳过（真实后端/模型 E2E 需环境变量启用）。新增用例：目录映射（空组剔除、失败项、默认选型）、快照投影（next 优先/回退 lastUsed/未选型 null）、`model/selection` 事件解析、VM 目录填充与快照选型、下拉选型回声与跨会话各自跟随、选型失败回退并报错、模拟服务选型回声与快照携带、缺失会话选型抛错；`RealModelConfigurationTests`/`RealModelConversationTests` 改走服务公开 API（目录断言改为 groups 含目标提供方）。
 - 窗口验收（UI Automation 驱动模拟模式）：下拉展开列出全部选项（Sim Chat/Sim Reasoner · Simulated、Alt Chat · Simulated Alt），选择后回显「Alt Chat · Simulated Alt」；切换到「Native AOT 验证」会话后下拉自动变为该会话的「Sim Reasoner · Simulated」。
 - 未验证：真实 Host 下的目录/选型窗口内交互（`RealModelConfigurationTests` 需 `DSH_E2E_*` 环境变量运行，真实目录此前已验收列出 `glm`）；reasoning effort 档位选择（目录含该字段但暂无 UI 消费方）；Native AOT 产物未随本轮重跑（无新增反射依赖）；macOS/Linux。
@@ -320,7 +320,7 @@ usage/token/缓存统计接入验证记录（Windows 10 x64，2026-09-21）：
 
 - 背景（用户按既定方案顺序提出）：token 用量、缓存命中率与生成速度此前为「—」占位，流式解析把 usage 等帧归为未解释类型。规则核对自参考实现：`llm/src/types.ts` 的 `TokenUsage`（四桶互斥：inputTokens 仅未命中缓存部分，缓存读/写单独计）、`token-meter/src/usage-projection.ts`（`tokenUsage` 投影，whole-log 累计，view 即四桶）、`session/session-stats/src/projection.ts`（`sessionStats` 投影：turns/steps/llmMs/toolMs/ttft/decodeMs/decodeTokens）、`ui-chat/src/client/chat/StatsPills.tsx` 与 `token-format.ts`（展示口径：总量=计费输入+输出；缓存命中率=缓存读/计费输入，取整、接近 100 时保留一位小数；速度=解码 token/解码时长；紧凑计数 12.2K/1.2M）。传输路径：follow 快照 `projections.values`（冷会话也携带全部投影 wire 视图）+ `session/control` Host 级状态流（每代 Baseline 后按会话 projection 整值更新）。
 - 实现：Core 新增 `SessionUsage`/`SessionStats` 与 `SessionUpdate.UsageUpdated`/`StatsUpdated`（整值替换 + 投影 seq 供乱序 gating）；Harness 新增 `SessionControlFrame` 解析（baseline/projection 帧，jobs 帧无消费方解析为 null）与 `HarnessConnection.FollowSessionControlAsync`（复用通用流泵，重连自动重开）；快照解析 `tokenUsage`/`sessionStats` 投影并随 `ProjectionAsOfSeq` 下发；`FollowSessionAsync` 重构为 follow 流与 control 流双泵合并（control 失败静默，不拖垮会话订阅）；模拟服务按会话记账（预置会话从助手条目推演初始计量，推送消息按一步计费累计）并经同一快照/增量路径下发；ViewModel 维护 usage/stats（seq gating、会话切换重置），`TokenFormat`（Utils）承载展示格式化；XAML 统计栏占位替换为绑定值，悬停显示四桶与轮次/步数/耗时明细。
-- `dotnet build DeepseekHarnessDesktop.slnx`：通过，0 警告 0 错误。
+- `dotnet build DshDesktop.slnx`：通过，0 警告 0 错误。
 - `dotnet test`：56 通过、3 按设计跳过。新增用例：快照 usage/stats 投影解析（含投影缺失容错）、control baseline/projection 帧解析（未知键与 jobs 帧忽略）、模拟服务快照携带计量与回复累计（含重订阅持久）、VM 统计随会话更新/切换重置/文案带真实数值。
 - 真实 Host 验证（`DSH_E2E_RUNTIME_DIR=<开发 runtime> dotnet test --filter RealBackendE2ETests`，2026-09-21）：通过——快照 `tokenUsage` 投影对真实 Host 到达并解析（新会话全零，符合空会话预期）；`session/control` 流 Baseline 到达且含被跟随会话的投影（基线投影会话数 1），端点名与帧形态实证。
 - 窗口验收（模拟模式截图，长会话选中）：统计栏显示「Token 用量 1.7K · 缓存命中 84% · 生成速度 21.2 tok/s」，占位「—」已由真实绑定值替换。
@@ -345,9 +345,9 @@ usage/token/缓存统计接入验证记录（Windows 10 x64，2026-09-21）：
 
 - 协议核对：参考 Gateway 的 `RemoteEventInvocationFrame` 与 `parseRemoteEventResult`，确认 waterfall 帧为 `event/eventId/agentId/request`；`$events/result` 的 outcome 为严格的 `next`、`result` 或 `rejected` 三形态。审批请求载荷为 `toolName`、可选 `callId`/`reason`，`agentId` 即会话 id；工具审批结果使用 `result + allowed-once/rejected`，取消通过 `cancel` 帧处理。
 - 实现：Core 新增 `IToolApprovalService`/`PendingApproval`；Harness 完整解析 waterfall 字段，审批服务维护跨会话待决列表，按 `agentId` 映射会话，处理 cancel/连接代重置，并经 `$events/result` 回执；回执失败保留待决项以便重试；未知 waterfall 保持可解析并继续走 rejected 回执。Desktop 与模拟服务完成组装，悬浮输入面板展示当前会话审批横幅及「允许一次/拒绝」操作。
-- `dotnet build DeepseekHarnessDesktop.slnx`：通过，0 警告 0 错误。
-- `dotnet test DeepseekHarnessDesktop.Tests/DeepseekHarnessDesktop.Tests.csproj --no-restore`：60 通过、3 按设计跳过；新增 waterfall 帧/审批载荷、三种 outcome 严格 JSON 形态、未知 request 保持可拒绝的协议测试，以及当前会话审批过滤/允许一次命令回归。
-- `dotnet publish DeepseekHarnessDesktop/DeepseekHarnessDesktop.csproj -c Release -r win-x64 --self-contained true --no-restore -p:UsedAvaloniaProducts=`：通过，Windows x64 Native AOT 产物生成成功。普通 publish 因当前环境无法读取用户级 NuGet/Avalonia telemetry 目录，使用跳过 Avalonia telemetry 统计的等价本地验证参数完成。
+- `dotnet build DshDesktop.slnx`：通过，0 警告 0 错误。
+- `dotnet test DshDesktop.Tests/DshDesktop.Tests.csproj --no-restore`：60 通过、3 按设计跳过；新增 waterfall 帧/审批载荷、三种 outcome 严格 JSON 形态、未知 request 保持可拒绝的协议测试，以及当前会话审批过滤/允许一次命令回归。
+- `dotnet publish DshDesktop/DshDesktop.csproj -c Release -r win-x64 --self-contained true --no-restore -p:UsedAvaloniaProducts=`：通过，Windows x64 Native AOT 产物生成成功。普通 publish 因当前环境无法读取用户级 NuGet/Avalonia telemetry 目录，使用跳过 Avalonia telemetry 统计的等价本地验证参数完成。
 - 未验证：真实 Host 触发实际工具审批并在窗口点击后的端到端往返；用户问题 waterfall；macOS/Linux。
 
 后续每个阶段记录：实现范围、目标平台、必要验证命令、实际结果、未验证事项。只有验收通过的任务才标记完成。

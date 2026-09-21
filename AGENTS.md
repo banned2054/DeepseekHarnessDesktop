@@ -40,12 +40,12 @@
 
 | 项目 | 职责 | 允许的项目依赖 |
 | --- | --- | --- |
-| `DeepseekHarnessDesktop` | Avalonia 入口、Views、ViewModels、界面状态、应用组装 | Core、Harness、Infrastructure |
-| `DeepseekHarnessDesktop.Core` | UI 无关的应用模型和服务契约 | 不依赖其他生产项目 |
-| `DeepseekHarnessDesktop.Harness` | 协议 DTO、认证、请求、事件、应用模型转换 | Core |
-| `DeepseekHarnessDesktop.Infrastructure` | Host 生命周期、本地设置、日志、系统能力 | Core |
+| `DshDesktop` | Avalonia 入口、Views、ViewModels、界面状态、应用组装 | Core、Harness、Infrastructure |
+| `DshDesktop.Core` | UI 无关的应用模型和服务契约 | 不依赖其他生产项目 |
+| `DshDesktop.Harness` | 协议 DTO、认证、请求、事件、应用模型转换 | Core |
+| `DshDesktop.Infrastructure` | Host 生命周期、本地设置、日志、系统能力 | Core |
 
-- 测试项目为 `DeepseekHarnessDesktop.Tests`，按被测职责组织。
+- 测试项目为 `DshDesktop.Tests`，按被测职责组织。
 - Core 不引用 Avalonia，不承担具体操作系统或 Node 的实现。
 - Desktop 在启动位置组装服务；ViewModel 主要依赖 Core 接口，不直接解析协议或管理子进程。
 - Harness 与 Infrastructure 不互相引用，由 Desktop 通过 Core 契约协调。

@@ -1,10 +1,10 @@
-# DeepSeek Harness Desktop
+# DSH Desktop
 
 English | [简体中文](Docs/README.zh-CN.md)
 
 [![Development status](https://img.shields.io/badge/status-early_development-orange)](#-project-status) [![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/) [![Avalonia](https://img.shields.io/badge/Avalonia-12.1-7B2CBF)](https://avaloniaui.net/) [![License](https://img.shields.io/badge/license-Apache_2.0-green)](./LICENSE)
 
-**DeepSeek Harness Desktop** is an independent native desktop client for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), built with .NET 10, Avalonia, and MVVM.
+**DSH Desktop** is an independent native desktop client for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), built with .NET 10, Avalonia, and MVVM.
 
 It provides a desktop interface for browsing Harness sessions, holding streaming conversations, and following tool activity without using a browser or WebView as the application shell. The existing Node-based Harness backend remains the source of truth for sessions and agent execution.
 
@@ -12,7 +12,7 @@ It provides a desktop interface for browsing Harness sessions, holding streaming
 
 ## 🚧 Project Status
 
-DeepSeek Harness Desktop is in early development. Core conversation workflows are taking shape, but there is no stable release or installer yet. Interfaces, setup steps, and backend compatibility may change while development continues.
+DSH Desktop is in early development. Core conversation workflows are taking shape, but there is no stable release or installer yet. Interfaces, setup steps, and backend compatibility may change while development continues.
 
 Windows is the current development and validation platform. macOS and Linux are intended targets but have not yet been verified.
 
@@ -49,8 +49,8 @@ The detailed implementation stages and validation notes are tracked in the [deve
 ### Build and run
 
 ```powershell
-dotnet build DeepseekHarnessDesktop.slnx
-dotnet run --project DeepseekHarnessDesktop
+dotnet build DshDesktop.slnx
+dotnet run --project DshDesktop
 ```
 
 The application uses its simulated backend by default, so the interface can be developed without a local Harness runtime.
@@ -60,7 +60,7 @@ To use a separately built Harness runtime, select the real backend and provide i
 ```powershell
 $env:DSH_DESKTOP_BACKEND_MODE = "real"
 $env:DSH_DESKTOP_RUNTIME_DIR = "C:\path\to\deepseek-harness-runtime"
-dotnet run --project DeepseekHarnessDesktop
+dotnet run --project DshDesktop
 ```
 
 Real-backend development currently expects Node.js on `PATH` and reuses the Harness home at `DSH_HOME` or `~/.dsh`. Runtime acquisition and end-user distribution are not automated yet.

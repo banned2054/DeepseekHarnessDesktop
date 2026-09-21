@@ -1,10 +1,10 @@
-# DeepSeek Harness Desktop
+# DSH Desktop
 
 [English](../README.md) | 简体中文
 
 [![开发状态](https://img.shields.io/badge/状态-早期开发-orange)](#-项目状态) [![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/) [![Avalonia](https://img.shields.io/badge/Avalonia-12.1-7B2CBF)](https://avaloniaui.net/) [![License](https://img.shields.io/badge/license-Apache_2.0-green)](../LICENSE)
 
-**DeepSeek Harness Desktop** 是一个面向 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的独立原生桌面客户端，使用 .NET 10、Avalonia 和 MVVM 构建。
+**DSH Desktop** 是一个面向 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的独立原生桌面客户端，使用 .NET 10、Avalonia 和 MVVM 构建。
 
 它为浏览 Harness 会话、进行流式对话和查看工具执行过程提供桌面界面，不使用浏览器或 WebView 作为应用外壳。现有的 Node Harness 后端仍然是会话和 Agent 执行状态的权威来源。
 
@@ -12,7 +12,7 @@
 
 ## 🚧 项目状态
 
-DeepSeek Harness Desktop 仍处于早期开发阶段。核心对话流程正在逐步成形，但目前没有稳定版本或安装包；在继续开发期间，界面、配置方法和后端兼容性都可能发生变化。
+DSH Desktop 仍处于早期开发阶段。核心对话流程正在逐步成形，但目前没有稳定版本或安装包；在继续开发期间，界面、配置方法和后端兼容性都可能发生变化。
 
 Windows 是当前的主要开发和验证平台。macOS 和 Linux 是计划支持的目标平台，但尚未完成验证。
 
@@ -49,8 +49,8 @@ Windows 是当前的主要开发和验证平台。macOS 和 Linux 是计划支�
 ### 构建与启动
 
 ```powershell
-dotnet build DeepseekHarnessDesktop.slnx
-dotnet run --project DeepseekHarnessDesktop
+dotnet build DshDesktop.slnx
+dotnet run --project DshDesktop
 ```
 
 应用默认使用内置模拟后端，因此开发界面时不需要准备本地 Harness Runtime。
@@ -60,7 +60,7 @@ dotnet run --project DeepseekHarnessDesktop
 ```powershell
 $env:DSH_DESKTOP_BACKEND_MODE = "real"
 $env:DSH_DESKTOP_RUNTIME_DIR = "C:\path\to\deepseek-harness-runtime"
-dotnet run --project DeepseekHarnessDesktop
+dotnet run --project DshDesktop
 ```
 
 真实后端开发环境目前要求可以从 `PATH` 找到 Node.js，并复用 `DSH_HOME` 或 `~/.dsh` 中的 Harness 数据。Runtime 获取和面向最终用户的分发流程尚未自动化。

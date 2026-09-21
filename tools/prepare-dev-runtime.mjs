@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Prepare the development backend runtime layout for DeepseekHarnessDesktop.
+ * Prepare the development backend runtime layout for DshDesktop.
  *
  * The launcher expects a runtime directory whose node_modules contains both
  * @deepseek-ai/dsh (install anchor) and @deepseek-ai/dsh-desktop-host (entry).

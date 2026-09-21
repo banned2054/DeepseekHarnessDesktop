@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="DshDesktop/DshDesktop.csproj" />
+  <Project Path="DshDesktop.Core/DshDesktop.Core.csproj" />
+  <Project Path="DshDesktop.Harness/DshDesktop.Harness.csproj" />
+  <Project Path="DshDesktop.Infrastructure/DshDesktop.Infrastructure.csproj" />
+  <Project Path="DshDesktop.Tests/DshDesktop.Tests.csproj" />
+</Solution>
