@@ -326,6 +326,21 @@ usage/token/缓存统计接入验证记录（Windows 10 x64，2026-09-21）：
 - 窗口验收（模拟模式截图，长会话选中）：统计栏显示「Token 用量 1.7K · 缓存命中 84% · 生成速度 21.2 tok/s」，占位「—」已由真实绑定值替换。
 - 未验证：真实计费数据下的窗口内实时刷新（真实模型往返需 `DSH_E2E_REAL_MODEL=1` 与凭据；投影链路本身已对真实 Host 实证）；统计悬停明细的窗口内交互；Native AOT 产物未随本轮重跑（无新增反射依赖）；macOS/Linux。
 
+统计条空会话隐藏验证记录（Windows 10 x64，2026-09-21）：
+
+- 背景（用户提出）：新对话尚无往返数据时，底部「Token 用量 / 缓存命中 / 生成速度」三项以「—」占位常驻；参考 WebUI 空会话不渲染统计条。核对 `ui-chat` 编译产物 `StatsPills` 的口径：`stats.steps === 0 && !hasTokens`（hasTokens = 计费输入或输出 > 0）时组件整体返回 null。
+- 实现：ViewModel 新增值判断 `HasStatsData`（Stats 有步数或 Usage 四桶合计 > 0）并在 usage/stats setter 通知；XAML 统计条绑定 `IsVisible`，快捷键提示保留；删除无绑定且语义误导的死属性 `HasUsageValues`（非 null 判断会被冷会话全 0 投影骗到，判断必须基于数值——冷会话 follow 快照携带全 0 投影 wire 视图）。
+- `dotnet test`：62 通过、3 按设计跳过，连续 3 次无抖动。新增用例 `StatsStripStaysHiddenForBlankSessionUntilUsageArrives`：默认长会话可见 → 新建空会话（全 0 基线已回填）保持隐藏 → 首条回复落地后出现 → 再切到空会话重新隐藏。测试环境注记：沙箱会话需 `/m:1 /nodeReuse:false`（多节点 MSBuild 命名管道被禁）；Avalonia telemetry 写用户目录被拒时以完整文件访问放行（等价本地替代：`-p:UsedAvaloniaProducts=`，见上文 publish 记录）。
+- 未验证：窗口内实际视觉验收（本轮为 ViewModel 层验证 + XAML 单绑定，编译期绑定已校验）；Native AOT 产物未随本轮重跑（无新增反射依赖）；macOS/Linux。
+
+轮次折叠逐轮判定 + follow 竞态修复验证记录（Windows 10 x64，2026-09-21）：
+
+- 背景（用户对照 WebUI 提出）：同一会话「清理完成」轮在 WebUI 折叠为「3 次工具调用 · 3 条消息」，桌面端逐项展开。实证根因（对真实 home 只读 follow 本会话 + zstd 解包会话日志核对）：真实 follow 快照只发尾部窗口（约 100+ 条，`HasMore=true`），旧规则「历史读全才折叠」导致中途 attach 长会话全程不折叠；「加载更早」按钮在已加载窗口顶端、远离视口，易被误判为历史已读全。WebUI 折叠是因为其会话从空实时长出、已加载窗口天然全量。
+- 附带发现并修复两个真实问题：①真实 Host 会在快照尾部为开放轮合成 `reason=interrupted` 的 turn/end（seq 即 cursor，持久日志不存在，对应 harness `interruptedTurnClosers` 语义）——若不识别，中途 attach/重连会把生成中的轮提前折叠且真实边界到达后二次折叠；②follow 循环的会话守卫是检查-后-动作两段式，被抢占的旧会话循环可把迟到 stats/usage 整值写进新会话基线之后（全量套件偶发复现，现场转储定位：空会话出现 Steps=1 的串台统计）。
+- 实现（用户确认选「窗口内完整轮次即折叠」）：`TimelineAssembly` 移除全局 `AllowFolding`，改为逐轮判定——本轮起点（用户消息或上一轮边界）落在已加载窗口内才折叠，被截断的首轮保持逐项；`TurnBoundary`/`SessionUpdate.TurnEnded` 增加 `Reason`，快照应用时丢弃尾部 interrupted 合成边界；`BeginFollow` 引入代际门闩（`_followGate` 锁 + `_followEpoch`），follow 循环的「校验 + 应用」在锁内原子进行。
+- `dotnet test`：63 通过、3 按设计跳过；全量套件连跑 6 次无抖动（修复前约 1/3 概率复现串台）。新增用例 `SnapshotTailInterruptedBoundaryKeepsOpenTurnUnfoldedUntilRealEnd`（合成边界不提前结算、真实 turn/end 到达后单次折叠）；`LoadingOlderPrependsEntriesAndFoldsCompleteTurnsAtTheTop` 更新为首次翻页后即折叠完整轮次（`HasMore=true` 时）；统计条用例的零值基线等待收紧为按值判定并放宽到 5s。真实 Host 侧证据经临时诊断测试（boot 真实 runtime + follow 本会话）采集，用后已删除。
+- 未验证：窗口内视觉验收（含中途 attach 长会话的折叠形态、生成中轮不被提前折叠）；真实 Host 下重连场景的合成边界行为（仅以快照形态实证 + 模拟桩覆盖）；Native AOT 未随本轮重跑（无新增反射依赖）；macOS/Linux。
+
 阶段 3 工具审批 waterfall 验证记录（Windows 10 x64，2026-09-21）：
 
 - 协议核对：参考 Gateway 的 `RemoteEventInvocationFrame` 与 `parseRemoteEventResult`，确认 waterfall 帧为 `event/eventId/agentId/request`；`$events/result` 的 outcome 为严格的 `next`、`result` 或 `rejected` 三形态。审批请求载荷为 `toolName`、可选 `callId`/`reason`，`agentId` 即会话 id；工具审批结果使用 `result + allowed-once/rejected`，取消通过 `cancel` 帧处理。
