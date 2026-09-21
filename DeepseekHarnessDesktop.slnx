@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="DeepseekHarnessDesktop/DeepseekHarnessDesktop.csproj" />
+  <Project Path="DeepseekHarnessDesktop.Core/DeepseekHarnessDesktop.Core.csproj" />
+  <Project Path="DeepseekHarnessDesktop.Harness/DeepseekHarnessDesktop.Harness.csproj" />
+  <Project Path="DeepseekHarnessDesktop.Infrastructure/DeepseekHarnessDesktop.Infrastructure.csproj" />
+  <Project Path="DeepseekHarnessDesktop.Tests/DeepseekHarnessDesktop.Tests.csproj" />
+</Solution>
