@@ -1,0 +1,105 @@
+DeepSeek Harness Desktop
+Copyright (c) 2026 contributors to this repository.
+
+This file records copyright and third-party attribution information for
+DeepSeek Harness Desktop. It is not a replacement for the license files of
+the components listed below.
+
+Project license
+---------------
+
+The original code in this repository is licensed under the Apache License,
+Version 2.0. A complete copy is available in the LICENSE file. This NOTICE
+file does not replace that license and does not change the terms of any
+third-party component.
+
+DeepSeek Harness
+---------------
+
+DeepSeek Harness is an independent upstream project developed by DeepSeek AI:
+
+  https://github.com/deepseek-ai/deepseek-harness
+
+The upstream repository currently publishes its code under the MIT License and
+identifies the copyright as:
+
+  Copyright (c) 2026 DeepSeek
+
+This project is an independent native desktop client and is not affiliated
+with, sponsored by, or endorsed by DeepSeek AI. If this repository or a future
+distribution contains copied or modified DeepSeek Harness source, the complete
+applicable upstream MIT notice must be retained with that source or
+distribution, together with the exact source boundary and version.
+
+Avalonia UI
+-----------
+
+Avalonia UI is used as the native cross-platform UI framework:
+
+  https://github.com/AvaloniaUI/Avalonia
+
+Avalonia UI is licensed under the MIT License. The upstream license identifies
+the copyright holder as:
+
+  Copyright (c) AvaloniaUI OÜ. All Rights Reserved.
+
+The applicable package license and notice files distributed with the exact
+Avalonia packages remain authoritative.
+
+MIT License text for the MIT-licensed components above
+-------------------------------------------------------
+
+The MIT License (MIT)
+
+Copyright (c) 2026 DeepSeek
+Copyright (c) AvaloniaUI OÜ. All Rights Reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+.NET and Native AOT
+-------------------
+
+The application targets the .NET platform and may be distributed as a
+self-contained or Native AOT application. The .NET runtime, SDK components,
+and platform-specific native components have their own license and notice
+files. Release artifacts must preserve or provide those notices when the
+selected publish mode includes the corresponding components.
+
+Other dependencies
+------------------
+
+The complete dependency inventory is intentionally not hard-coded here until
+the project's package manifests and publish profiles stabilize. Before the
+first binary release, maintainers must audit direct and transitive runtime
+dependencies from the project files, NuGet assets, and final publish output,
+then add each distributed component's name, version, license, source URL, and
+required copyright/NOTICE text here or in a linked THIRD_PARTY_NOTICES.md.
+
+Development-only packages, analyzers, test frameworks, and build tools should
+be distinguished from components shipped to end users. A package's README is
+not a substitute for its actual license file; the exact package contents and
+license terms control.
+
+Trademark and affiliation
+-------------------------
+
+Product names and logos remain the property of their respective owners. The
+names DeepSeek Harness, DeepSeek, Avalonia, .NET, and Native AOT are used only
+to identify upstream projects or technologies. This notice does not grant any
+trademark rights or imply endorsement.

@@ -1,0 +1,82 @@
+# DeepSeek Harness Desktop
+
+[English](../README.md) | 简体中文
+
+[![开发状态](https://img.shields.io/badge/状态-早期开发-orange)](#-项目状态) [![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/) [![Avalonia](https://img.shields.io/badge/Avalonia-12.1-7B2CBF)](https://avaloniaui.net/) [![License](https://img.shields.io/badge/license-Apache_2.0-green)](../LICENSE)
+
+**DeepSeek Harness Desktop** 是一个面向 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的独立原生桌面客户端，使用 .NET 10、Avalonia 和 MVVM 构建。
+
+它为浏览 Harness 会话、进行流式对话和查看工具执行过程提供桌面界面，不使用浏览器或 WebView 作为应用外壳。现有的 Node Harness 后端仍然是会话和 Agent 执行状态的权威来源。
+
+> 本项目是独立项目，与 DeepSeek AI 没有隶属、赞助或官方背书关系。
+
+## 🚧 项目状态
+
+DeepSeek Harness Desktop 仍处于早期开发阶段。核心对话流程正在逐步成形，但目前没有稳定版本或安装包；在继续开发期间，界面、配置方法和后端兼容性都可能发生变化。
+
+Windows 是当前的主要开发和验证平台。macOS 和 Linux 是计划支持的目标平台，但尚未完成验证。
+
+## ✨ 当前能力
+
+- 基于 Avalonia 的原生界面，不使用浏览器或 WebView 外壳。
+- 以单列表或按工作区分组的方式浏览会话。
+- 创建会话、加载历史、接收流式回复、取消生成和恢复连接。
+- 渲染 Markdown 回复、思考内容、中断状态，并分页加载历史记录。
+- 展示工具调用进度、结果和错误，按轮次折叠执行过程。
+- 按会话选择模型，展示 Token 用量、缓存命中率和生成速度。
+- 处理工具审批，支持“允许一次”和“拒绝”。
+- 明确管理 Harness Host 的启动、认证、关闭和子进程清理。
+- 使用 XAML 编译绑定和 JSON 源生成，并已验证 Windows x64 Native AOT 发布。
+
+## 🗺️ 后续计划
+
+- 补齐用户问题等尚未完成的对话交互。
+- 完成工作区管理、设置和偏好持久化。
+- 验证断线恢复、长会话性能、快捷键和输入法体验。
+- 分别构建并测试 macOS 和 Linux 原生产物。
+- 在核心流程稳定后加入打包、更新等分发能力。
+
+详细实施阶段和验证记录见[开发计划](../plan.md)。
+
+## 🚀 开发运行
+
+### 环境要求
+
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+- 当前已验证的开发路径使用 Windows
+- 仅在连接真实后端时需要 Node.js 和单独构建的 DeepSeek Harness Runtime
+
+### 构建与启动
+
+```powershell
+dotnet build DeepseekHarnessDesktop.slnx
+dotnet run --project DeepseekHarnessDesktop
+```
+
+应用默认使用内置模拟后端，因此开发界面时不需要准备本地 Harness Runtime。
+
+如需连接单独构建的 Harness Runtime，请在启动前选择真实后端并指定其目录：
+
+```powershell
+$env:DSH_DESKTOP_BACKEND_MODE = "real"
+$env:DSH_DESKTOP_RUNTIME_DIR = "C:\path\to\deepseek-harness-runtime"
+dotnet run --project DeepseekHarnessDesktop
+```
+
+真实后端开发环境目前要求可以从 `PATH` 找到 Node.js，并复用 `DSH_HOME` 或 `~/.dsh` 中的 Harness 数据。Runtime 获取和面向最终用户的分发流程尚未自动化。
+
+## 🖥️ 平台状态
+
+| 平台 | 状态 |
+| --- | --- |
+| Windows x64 | 已验证开发构建、真实后端接入和 Native AOT 发布 |
+| macOS | 计划支持，尚未验证 |
+| Linux | 计划支持，尚未验证 |
+
+## ⚖️ License
+
+本项目采用 [Apache License 2.0](../LICENSE) 授权。[NOTICE](../NOTICE) 包含上游致谢和第三方声明。
+
+## 🤝 Contributing
+
+项目目前仍在建立核心行为。欢迎提交范围明确的 Issue 和 Pull Request；涉及行为变化时，请尽量补充测试，并明确区分已经实现的行为和后续计划。
