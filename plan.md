@@ -361,6 +361,15 @@ UI 层目录重构验证记录（Windows 10 x64，2026-09-22）：
 - AOT 产物启动冒烟（模拟模式）：进程 8 秒存活后正常终止——全部 ResourceInclude/StyleInclude URI、DataTemplate 与布局在运行时解析无异常。
 - 未验证：窗口内交互复验（侧栏拖拽/折叠、Enter 发送、工具卡展开、审批按钮点击、流式贴底）——本环境无窗口级自动化，逻辑为原样搬迁且 VM 层测试通过，待用户日常使用确认；深色主题像素级对照；macOS/Linux。
 
+前插历史滚动锚定修复验证记录（Windows 10 x64，2026-09-22）：
+
+- 背景（用户复查重构提出）：`_anchoringPrepend` 无任何置真路径。git 考古确认仓库初始快照（2026-09-21）即缺失 setter，plan.md 记载 2026-09-20 曾实现并截图验证过锚定补偿，进仓库前丢失。
+- 行为判定：真实存在用户可见 bug——点击「加载更早」后视口跳到已加载历史顶端。两条依据：① Avalonia 12.1 `ScrollContentPresenter` 的锚定补偿（`ArrangeWithAnchoring`）只对经 `RegisterAnchorCandidate` 注册的锚点元素生效（通常由虚拟化面板注册），本项目时间线为普通 `ItemsControl` + 非虚拟化 `StackPanel`，无锚点候选，框架不做任何补偿；② 翻页前插由 `RebuildTimeline` 以 Clear + 整体重灌实现，UI 侧只见 Reset + 顺序 Add（无 `Insert(0)` 事件），Clear 与重灌同步发生在同一帧，布局净效果等价前插，原偏移落在新内容顶端。
+- 实现（`ConversationView.axaml.cs`，+12 行）：置锚判据为「`IsLoadingOlder=true` 窗口内到达的 `ConversationItems` Reset」——翻页重建专属信号，会话切换等其它 Reset 不置锚（其偏移归零属预期，2026-09-20 截图修复的语义保持不变）；补偿分支同时推进 `_messagesExtent` 基线，避免后续流式增高拿过期 extent 误判贴底。解除时序不变：`IsLoadingOlder=false` 后 Post 到 Background 优先级（低于 Layout），布局落地后才解除。流式贴底与用户上翻不打扰逻辑未动。
+- 测试：新增 2 项 VM 层调用顺序契约测试——`LoadOlderRebuildRaisesResetInsideLoadingWindow`（翻页重建的 Reset 必须在 IsLoadingOlder 窗口内，即视图置锚判据成立）与 `SessionSwitchRebuildRaisesResetOutsideLoadingWindow`（会话切换的 Reset 不进入窗口，不误触发锚定）。视图级状态机测试在本环境不可行：testhost 以真实 Win32 平台 `SetupWithoutStarting` 初始化后，任何 `await` 的线程延续切换都会原生崩溃 testhost（构造视图与否无关）；引入 Avalonia.Headless 与既有平台初始化冲突，超出本任务范围，未采用。
+- `dotnet build DshDesktop.slnx`：0 警告 0 错误。`dotnet test`：66 通过、3 按设计跳过，连续 3 次无抖动。无反射/新依赖/XAML 变化，不影响 Native AOT 路径，未重跑 AOT 发布。
+- 未验证：窗口内「点击加载更早后视口保持不动」的人工复验（逻辑与 2026-09-20 截图验证版一致并补回置真路径）；macOS/Linux。
+
 后续每个阶段记录：实现范围、目标平台、必要验证命令、实际结果、未验证事项。只有验收通过的任务才标记完成。
 
 

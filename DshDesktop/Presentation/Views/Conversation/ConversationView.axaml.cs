@@ -62,6 +62,16 @@ public partial class ConversationView : UserControl
     /// <summary>新消息到达时，若用户本就停在底部附近则继续贴底；用户上翻时不打扰。</summary>
     private void KeepScrolledToBottom(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        // 翻页以 Clear + 整体重灌实现前插（ViewModel.RebuildTimeline）：IsLoadingOlder
+        // 窗口内的 Reset 即前插起点，随后一次布局的 extent 增量需要锚定补偿，
+        // 否则视口按原偏移落在新内容上（跳到已加载历史的顶端）。会话切换等其它
+        // Reset 不置锚——其偏移归零属预期，补偿反而会把视口抬到错误位置。
+        if (e.Action == NotifyCollectionChangedAction.Reset
+            && DataContext is MainWindowViewModel { IsLoadingOlder: true })
+        {
+            _anchoringPrepend = true;
+        }
+
         var scroll = MessagesScroll;
         if (scroll is not null && WasNearBottom(scroll, scroll.Extent.Height))
         {
@@ -85,6 +95,8 @@ public partial class ConversationView : UserControl
         if (_anchoringPrepend && e.ExtentDelta.Y > 0)
         {
             // 顶部插入内容把既有内容向下推；同步抬高偏移，用户看到的位置保持不变。
+            // 补偿分支同样推进 extent 基线，避免后续流式增高拿过期 extent 误判贴底。
+            _messagesExtent = scroll.Extent.Height;
             scroll.Offset = scroll.Offset.WithY(scroll.Offset.Y + e.ExtentDelta.Y);
             return;
         }

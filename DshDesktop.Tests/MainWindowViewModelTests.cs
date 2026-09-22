@@ -4,6 +4,7 @@ using DshDesktop.Core.Services;
 using DshDesktop.Infrastructure.Services;
 using DshDesktop.Presentation.Views;
 using DshDesktop.ViewModels;
+using System.Collections.Specialized;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Xunit;
@@ -44,6 +45,60 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         Assert.Same(viewModel, window.DataContext);
 
         window.Close();
+        await viewModel.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task LoadOlderRebuildRaisesResetInsideLoadingWindow()
+    {
+        var viewModel = CreateViewModel();
+        await viewModel.InitializeAsync();
+        viewModel.SelectedSession = viewModel.Sessions.First(session => session.Id == "session-history");
+        await WaitUntilAsync(() => viewModel.ConversationItems.Count == 5);
+
+        // 视图以前插锚定补偿翻页跳动，置锚判据是「IsLoadingOlder 窗口内到达的 Reset」：
+        // 翻页重建（Clear + 整体重灌，见 RebuildTimeline）的 Reset 必须发生在窗口内，
+        // 否则视图无法区分翻页前插与会话切换，锚定会失效或误触发。
+        var events = new List<(NotifyCollectionChangedAction Action, bool LoadingOlder)>();
+        viewModel.ConversationItems.CollectionChanged +=
+            (_, e) => events.Add((e.Action, viewModel.IsLoadingOlder));
+
+        viewModel.LoadOlderCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.ConversationItems[0].Seq == 23 && !viewModel.IsLoadingOlder);
+
+        Assert.Contains(events,
+                        recorded => recorded is { Action: NotifyCollectionChangedAction.Reset, LoadingOlder: true });
+
+        await viewModel.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task SessionSwitchRebuildRaisesResetOutsideLoadingWindow()
+    {
+        var viewModel = CreateViewModel();
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.SelectedSession is not null);
+        var firstSessionId = viewModel.SelectedSession!.Id;
+        await WaitUntilAsync(() => viewModel.ConversationItems.Count > 0);
+
+        // 切换会话同样以 Reset 重建时间线，但不得处于 IsLoadingOlder 窗口内：
+        // 会话切换的偏移归零属预期行为，进入锚定窗口会把视口抬到错误位置。
+        var sawReset = false;
+        var sawResetWhileLoadingOlder = false;
+        viewModel.ConversationItems.CollectionChanged += (_, e) =>
+        {
+            if (e.Action != NotifyCollectionChangedAction.Reset) return;
+            sawReset = true;
+            if (viewModel.IsLoadingOlder) sawResetWhileLoadingOlder = true;
+        };
+
+        viewModel.SelectedSession =
+            viewModel.Sessions.First(session => session.Id != firstSessionId);
+        await WaitUntilAsync(() => viewModel.ConversationItems.Count > 0);
+
+        Assert.True(sawReset);
+        Assert.False(sawResetWhileLoadingOlder);
+
         await viewModel.DisposeAsync();
     }
 
