@@ -11,6 +11,13 @@
 
     <Application.Styles>
         <FluentTheme />
+        <!-- Codex 风格滚动条：Thumb 在任何状态下保持胶囊形。
+             Fluent 模板的 Thumb 无 Margin、无内缩边框，纵向宽/横向高都直接绑定 ScrollBarSize（6px），
+             因此 CornerRadius 取厚度一半（3）即可让两端呈完整半圆，纵向横向一致；
+             主题状态样式只改 Thumb 背景，圆角在 pointerover/pressed 等状态下均由本样式稳定接管。 -->
+        <Style Selector="ScrollBar /template/ Thumb">
+            <Setter Property="CornerRadius" Value="3" />
+        </Style>
         <!-- LiveMarkdown.Avalonia 控件样式（代码块、行内代码、链接等）；跟随 FluentTheme 之后加载。 -->
         <StyleInclude Source="avares://LiveMarkdown.Avalonia/Styles.axaml" />
         <!-- 覆盖库默认 CodeBlock 模板：参照 Codex 的代码框——一体化深底圆角、无外描边、
@@ -144,6 +151,21 @@
             <SolidColorBrush x:Key="CodeBlockButtonActiveBrush" Color="#2EFFFFFF" />
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Dark">
+                    <!-- Scrollbars: state changes affect color only; thickness and shape stay fixed. -->
+                    <x:Double x:Key="ScrollBarSize">6</x:Double>
+                    <TransformOperations x:Key="VerticalSmallScrollThumbScaleTransform">none</TransformOperations>
+                    <TransformOperations x:Key="HorizontalSmallScrollThumbScaleTransform">none</TransformOperations>
+                    <SolidColorBrush x:Key="ScrollBarPanningThumbBackground" Color="#3C3C3D" />
+                    <SolidColorBrush x:Key="ScrollBarThumbFillPointerOver" Color="#9E9E9F" />
+                    <SolidColorBrush x:Key="ScrollBarThumbFillPressed" Color="#9E9E9F" />
+                    <SolidColorBrush x:Key="ScrollBarThumbFillDisabled" Color="#3C3C3D" />
+                    <SolidColorBrush x:Key="ScrollBarThumbBackgroundColor" Color="#9E9E9F" />
+                    <SolidColorBrush x:Key="ScrollBarTrackFill" Color="Transparent" />
+                    <SolidColorBrush x:Key="ScrollBarTrackFillPointerOver" Color="Transparent" />
+                    <SolidColorBrush x:Key="ScrollBarTrackStroke" Color="Transparent" />
+                    <SolidColorBrush x:Key="ScrollBarTrackStrokePointerOver" Color="Transparent" />
+                    <SolidColorBrush x:Key="ScrollBarBackground" Color="Transparent" />
+                    <SolidColorBrush x:Key="ScrollBarBorderBrush" Color="Transparent" />
                     <!-- 表面：侧栏底色为本轮指定的 #1B1B1C 中性灰。 -->
                     <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#1B1B1C" />
                     <SolidColorBrush x:Key="ChatBackgroundBrush" Color="#10131B" />
@@ -155,6 +177,8 @@
                     <SolidColorBrush x:Key="ComposerTextBrush" Color="#F1F1F3" />
                     <SolidColorBrush x:Key="ComposerTextMutedBrush" Color="#A7ABB4" />
                     <SolidColorBrush x:Key="ComposerActionBrush" Color="#679EFE" />
+                    <!-- 输入框聚焦时的面板描边：中性灰轻微提亮，避免强调色矩形观感。 -->
+                    <SolidColorBrush x:Key="ComposerFocusRingBrush" Color="#3F3F47" />
                     <!-- 会话列表：选中态为本轮指定的 #2D2D2E；悬停取其与底色之间的
                          中性灰 #262627——清晰但不过亮，也不会盖过选中态。 -->
                     <SolidColorBrush x:Key="SessionHoverBrush" Color="#262627" />
@@ -178,6 +202,21 @@
                     <SolidColorBrush x:Key="StatusErrorBrush" Color="#FF9A9A" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Light">
+                    <!-- Scrollbars: state changes affect color only; thickness and shape stay fixed. -->
+                    <x:Double x:Key="ScrollBarSize">6</x:Double>
+                    <TransformOperations x:Key="VerticalSmallScrollThumbScaleTransform">none</TransformOperations>
+                    <TransformOperations x:Key="HorizontalSmallScrollThumbScaleTransform">none</TransformOperations>
+                    <SolidColorBrush x:Key="ScrollBarPanningThumbBackground" Color="#E4E4E5" />
+                    <SolidColorBrush x:Key="ScrollBarThumbFillPointerOver" Color="#585A5B" />
+                    <SolidColorBrush x:Key="ScrollBarThumbFillPressed" Color="#585A5B" />
+                    <SolidColorBrush x:Key="ScrollBarThumbFillDisabled" Color="#E4E4E5" />
+                    <SolidColorBrush x:Key="ScrollBarThumbBackgroundColor" Color="#585A5B" />
+                    <SolidColorBrush x:Key="ScrollBarTrackFill" Color="Transparent" />
+                    <SolidColorBrush x:Key="ScrollBarTrackFillPointerOver" Color="Transparent" />
+                    <SolidColorBrush x:Key="ScrollBarTrackStroke" Color="Transparent" />
+                    <SolidColorBrush x:Key="ScrollBarTrackStrokePointerOver" Color="Transparent" />
+                    <SolidColorBrush x:Key="ScrollBarBackground" Color="Transparent" />
+                    <SolidColorBrush x:Key="ScrollBarBorderBrush" Color="Transparent" />
                     <!-- 表面：sidebar-fill / bg-base / module-platform / border-l2 -->
                     <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#F9FAFB" />
                     <SolidColorBrush x:Key="ChatBackgroundBrush" Color="#FFFFFF" />
@@ -189,6 +228,8 @@
                     <SolidColorBrush x:Key="ComposerTextBrush" Color="#1A1D22" />
                     <SolidColorBrush x:Key="ComposerTextMutedBrush" Color="#70757E" />
                     <SolidColorBrush x:Key="ComposerActionBrush" Color="#3964FE" />
+                    <!-- 输入框聚焦时的面板描边：中性灰加深一档（当前固定 Dark 主题，仅保持完整性）。 -->
+                    <SolidColorBrush x:Key="ComposerFocusRingBrush" Color="#C7CBD3" />
                     <!-- 会话列表：nav-item-hover / nav-item-active-accent -->
                     <SolidColorBrush x:Key="SessionHoverBrush" Color="#F1F3F5" />
                     <SolidColorBrush x:Key="SessionSelectedBrush" Color="#E4EDFD" />
