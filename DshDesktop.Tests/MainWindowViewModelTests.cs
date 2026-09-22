@@ -53,8 +53,8 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
     {
         var viewModel = CreateViewModel();
         await viewModel.InitializeAsync();
-        viewModel.SelectedSession = viewModel.Sessions.First(session => session.Id == "session-history");
-        await WaitUntilAsync(() => viewModel.ConversationItems.Count               == 5);
+        viewModel.SelectedSession = viewModel.Sidebar.Sessions.First(session => session.Id == "session-history");
+        await WaitUntilAsync(() => viewModel.ConversationItems.Count                       == 5);
 
         // 视图以前插锚定补偿翻页跳动，置锚判据是「IsLoadingOlder 窗口内到达的 Reset」：
         // 翻页重建（Clear + 整体重灌，见 RebuildTimeline）的 Reset 必须发生在窗口内，
@@ -93,7 +93,7 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         };
 
         viewModel.SelectedSession =
-            viewModel.Sessions.First(session => session.Id != firstSessionId);
+            viewModel.Sidebar.Sessions.First(session => session.Id != firstSessionId);
         await WaitUntilAsync(() => viewModel.ConversationItems.Count > 0);
 
         Assert.True(sawReset);
@@ -140,7 +140,7 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         await viewModel.InitializeAsync();
         await WaitUntilAsync(() => viewModel.ConversationItems.Count > 0);
 
-        viewModel.SelectedSession = viewModel.Sessions.First(session => session.Id == "session-native");
+        viewModel.SelectedSession = viewModel.Sidebar.Sessions.First(session => session.Id == "session-native");
         await WaitUntilAsync(() => viewModel.ConversationItems.OfType<MessageItemViewModel>().Count() == 2);
 
         Assert.False(viewModel.HasError);
@@ -260,7 +260,7 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         Assert.False(viewModel.HasError);
 
         // 切换会话：另一会话的快照携带各自的当前选型。
-        viewModel.SelectedSession = viewModel.Sessions.First(session => session.Id == "session-native");
+        viewModel.SelectedSession = viewModel.Sidebar.Sessions.First(session => session.Id == "session-native");
         await WaitUntilAsync(() => viewModel.SelectedSession!.Id == "session-native"
                                 && viewModel.Composer.CurrentModel is { Provider: "sim", Model: "sim-reasoner" });
         Assert.False(viewModel.HasError);
@@ -303,7 +303,7 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         var longUsage = viewModel.Composer.Usage!;
 
         // 切到单条助手消息的会话：统计按会话重置并携带该会话的累计值。
-        viewModel.SelectedSession = viewModel.Sessions.First(session => session.Id == "session-design");
+        viewModel.SelectedSession = viewModel.Sidebar.Sessions.First(session => session.Id == "session-design");
         await WaitUntilAsync(() => viewModel.SelectedSession!.Id == "session-design" &&
                                    viewModel.Composer.Usage is { OutputTokens: > 0 });
         Assert.True(viewModel.Composer.Usage!.OutputTokens < longUsage.OutputTokens);
@@ -333,7 +333,7 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
 
         // 新建空会话：follow 快照会回填全 0 的 usage/stats 整值（对齐真实后端冷会话
         // 携带投影 wire 视图的口径），统计条保持隐藏，不显示占位「—」。
-        viewModel.NewSessionCommand.Execute(null);
+        viewModel.Sidebar.NewSessionCommand.Execute(null);
         await WaitUntilAsync(() => viewModel.SelectedSession is { Id: not "session-history" });
         // 等待零值基线本身：仅判非 null 可能命中上一会话尚未清空的旧值（短暂可见性窗口）。
         await WaitOrDumpAsync(viewModel,
@@ -348,7 +348,7 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         Assert.False(viewModel.HasError);
 
         // 再切到另一个空会话：按会话重置后重新隐藏。
-        viewModel.NewSessionCommand.Execute(null);
+        viewModel.Sidebar.NewSessionCommand.Execute(null);
         await WaitUntilAsync(() => viewModel.SelectedSession!.Id != blankSessionId);
         await WaitOrDumpAsync(viewModel,
                               () => viewModel.Composer is
@@ -398,7 +398,7 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         var backendService = new SimulatedBackendStatusService();
         var viewModel      = new MainWindowViewModel(sessionService, backendService, new StaticWorkspaceService());
         await viewModel.InitializeAsync();
-        viewModel.SelectedSession = viewModel.Sessions.First(session => session.Id == "session-history");
+        viewModel.SelectedSession = viewModel.Sidebar.Sessions.First(session => session.Id == "session-history");
         // 初始窗口是最近 3 条消息及其附随条目（说明、工具、思考、工具、总结、turn/end）；
         // turn/end 边界不产生可见条目，可见项为 5。
         await WaitUntilAsync(() => viewModel.ConversationItems.Count == 5);
@@ -592,11 +592,11 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         var backendService = new SimulatedBackendStatusService();
         var viewModel      = new MainWindowViewModel(sessionService, backendService, new StaticWorkspaceService());
         await viewModel.InitializeAsync();
-        viewModel.SelectedSession = viewModel.Sessions.First(session => session.Id == "session-history");
+        viewModel.SelectedSession = viewModel.Sidebar.Sessions.First(session => session.Id == "session-history");
 
         await WaitUntilAsync(() => viewModel.ConversationItems.Count == 5);
 
-        viewModel.SelectedSession = viewModel.Sessions.First(session => session.Id == "session-welcome");
+        viewModel.SelectedSession = viewModel.Sidebar.Sessions.First(session => session.Id == "session-welcome");
         await WaitUntilAsync(() => viewModel.ConversationItems.OfType<MessageItemViewModel>().Count() == 2);
 
         Assert.False(viewModel.HasMoreHistory);
@@ -612,7 +612,7 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         var viewModel      = new MainWindowViewModel(sessionService, backendService, new StaticWorkspaceService());
         await viewModel.InitializeAsync();
         // 选一个没有预置工具条目的会话，避免与演示数据中的 fs.read 混淆。
-        viewModel.SelectedSession = viewModel.Sessions.First(session => session.Id == "session-welcome");
+        viewModel.SelectedSession = viewModel.Sidebar.Sessions.First(session => session.Id == "session-welcome");
         await WaitUntilAsync(() => viewModel.ConversationItems.OfType<MessageItemViewModel>().Count() == 2);
         var before = viewModel.ConversationItems.Count;
 
@@ -638,7 +638,7 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         var backendService = new SimulatedBackendStatusService();
         var viewModel      = new MainWindowViewModel(sessionService, backendService, new StaticWorkspaceService());
         await viewModel.InitializeAsync();
-        viewModel.SelectedSession = viewModel.Sessions.First(session => session.Id == "session-welcome");
+        viewModel.SelectedSession = viewModel.Sidebar.Sessions.First(session => session.Id == "session-welcome");
         await WaitUntilAsync(() => viewModel.ConversationItems.OfType<MessageItemViewModel>().Count() == 2);
 
         sessionService.PushToolActivity(viewModel.SelectedSession!.Id, "shell.run", null, true);
@@ -660,7 +660,7 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         var backendService = new SimulatedBackendStatusService();
         var viewModel      = new MainWindowViewModel(sessionService, backendService, new StaticWorkspaceService());
         await viewModel.InitializeAsync();
-        viewModel.SelectedSession = viewModel.Sessions.First(session => session.Id == "session-welcome");
+        viewModel.SelectedSession = viewModel.Sidebar.Sessions.First(session => session.Id == "session-welcome");
         await WaitUntilAsync(() => viewModel.ConversationItems.OfType<MessageItemViewModel>().Count() == 2);
         var sessionId = viewModel.SelectedSession!.Id;
 
@@ -726,7 +726,7 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         var backendService = new SimulatedBackendStatusService();
         var viewModel      = new MainWindowViewModel(sessionService, backendService, new StaticWorkspaceService());
         await viewModel.InitializeAsync();
-        viewModel.SelectedSession = viewModel.Sessions.First(session => session.Id == "session-welcome");
+        viewModel.SelectedSession = viewModel.Sidebar.Sessions.First(session => session.Id == "session-welcome");
         await WaitUntilAsync(() => viewModel.ConversationItems.OfType<MessageItemViewModel>().Count() == 2);
         var sessionId = viewModel.SelectedSession!.Id;
 
@@ -771,7 +771,7 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         var backendService = new SimulatedBackendStatusService();
         var viewModel      = new MainWindowViewModel(sessionService, backendService, new StaticWorkspaceService());
         await viewModel.InitializeAsync();
-        viewModel.SelectedSession = viewModel.Sessions.First(session => session.Id == "session-welcome");
+        viewModel.SelectedSession = viewModel.Sidebar.Sessions.First(session => session.Id == "session-welcome");
         await WaitUntilAsync(() => viewModel.ConversationItems.OfType<MessageItemViewModel>().Count() == 2);
         var sessionId = viewModel.SelectedSession!.Id;
 
@@ -793,7 +793,7 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         var backendService = new SimulatedBackendStatusService();
         var viewModel      = new MainWindowViewModel(sessionService, backendService, new StaticWorkspaceService());
         await viewModel.InitializeAsync();
-        viewModel.SelectedSession = viewModel.Sessions.First(session => session.Id == "session-welcome");
+        viewModel.SelectedSession = viewModel.Sidebar.Sessions.First(session => session.Id == "session-welcome");
         await WaitUntilAsync(() => viewModel.ConversationItems.OfType<MessageItemViewModel>().Count() == 2);
         var sessionId = viewModel.SelectedSession!.Id;
 
@@ -826,19 +826,20 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
     {
         var viewModel = CreateViewModel();
         await viewModel.InitializeAsync();
-        await WaitUntilAsync(() => viewModel.Sessions.Count > 0);
+        await WaitUntilAsync(() => viewModel.Sidebar.Sessions.Count > 0);
 
         // 默认对齐参考客户端：按工作区分组（模拟服务登记了两个工作区）。
-        Assert.Equal(1, viewModel.SessionListModeIndex);
-        Assert.Contains(viewModel.SessionRows, row => row is SessionGroupHeaderViewModel { TitleText: "示例工作区" });
+        Assert.Equal(1, viewModel.Sidebar.SessionListModeIndex);
+        Assert.Contains(viewModel.Sidebar.SessionRows,
+                        row => row is SessionGroupHeaderViewModel { TitleText: "示例工作区" });
         Assert.True(viewModel.SelectedSession!.IsCurrent);
-        Assert.All(viewModel.Sessions.Where(session => !ReferenceEquals(session, viewModel.SelectedSession)),
+        Assert.All(viewModel.Sidebar.Sessions.Where(session => !ReferenceEquals(session, viewModel.SelectedSession)),
                    session => Assert.False(session.IsCurrent));
 
         // 切回单列表：行投影就是会话顺序本身，无分组头。
-        viewModel.SessionListModeIndex = 0;
-        Assert.Equal(viewModel.Sessions, viewModel.SessionRows.OfType<SessionItemViewModel>());
-        Assert.Empty(viewModel.SessionRows.OfType<SessionGroupHeaderViewModel>());
+        viewModel.Sidebar.SessionListModeIndex = 0;
+        Assert.Equal(viewModel.Sidebar.Sessions, viewModel.Sidebar.SessionRows.OfType<SessionItemViewModel>());
+        Assert.Empty(viewModel.Sidebar.SessionRows.OfType<SessionGroupHeaderViewModel>());
 
         await viewModel.DisposeAsync();
     }
@@ -846,8 +847,7 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
     [Fact]
     public async Task GroupingByWorkspaceProjectsHeadersMembersAndUngrouped()
     {
-        var workspaces = new StaticWorkspaceService(
-        [
+        var workspaces = new StaticWorkspaceService([
             new WorkspaceSummary("ws-main", "主工作区", "C:/Code/Main", ["session-native", "session-history"],
                                  DateTimeOffset.Now),
             new WorkspaceSummary("ws-empty", "空工作区", "C:/Code/Empty", [], DateTimeOffset.Now)
@@ -855,13 +855,13 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         var viewModel = new MainWindowViewModel(new SimulatedSessionService(), new SimulatedBackendStatusService(),
                                                 workspaces);
         await viewModel.InitializeAsync();
-        await WaitUntilAsync(() => viewModel.Sessions.Count > 0);
+        await WaitUntilAsync(() => viewModel.Sidebar.Sessions.Count > 0);
 
-        viewModel.SessionListModeIndex = 1;
+        viewModel.Sidebar.SessionListModeIndex = 1;
 
         // 组序为后端顺序；组内成员按更新时间降序；空工作区仍显示；
         // 未被记账的会话落入「未分组」且该组仅在非空时出现。
-        var shape = viewModel.SessionRows.Select(row => row switch
+        var shape = viewModel.Sidebar.SessionRows.Select(row => row switch
                               {
                                   SessionGroupHeaderViewModel header => $"header:{header.TitleText}",
                                   SessionItemViewModel session       => $"session:{session.Id}",
@@ -890,27 +890,27 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         var viewModel = new MainWindowViewModel(new SimulatedSessionService(), new SimulatedBackendStatusService(),
                                                 workspaces);
         await viewModel.InitializeAsync();
-        await WaitUntilAsync(() => viewModel.Sessions.Count > 0);
-        viewModel.SessionListModeIndex = 1;
+        await WaitUntilAsync(() => viewModel.Sidebar.Sessions.Count > 0);
+        viewModel.Sidebar.SessionListModeIndex = 1;
 
-        var mainHeader = viewModel.SessionRows.OfType<SessionGroupHeaderViewModel>()
+        var mainHeader = viewModel.Sidebar.SessionRows.OfType<SessionGroupHeaderViewModel>()
                                   .Single(header => header.Key == "ws-main");
-        viewModel.ToggleGroupCommand.Execute(mainHeader);
+        viewModel.Sidebar.ToggleGroupCommand.Execute(mainHeader);
 
-        Assert.DoesNotContain(viewModel.SessionRows.OfType<SessionItemViewModel>(),
+        Assert.DoesNotContain(viewModel.Sidebar.SessionRows.OfType<SessionItemViewModel>(),
                               session => session.Id is "session-native" or "session-history");
         // 其他组的成员不受影响。
-        Assert.Contains(viewModel.SessionRows.OfType<SessionItemViewModel>(),
+        Assert.Contains(viewModel.Sidebar.SessionRows.OfType<SessionItemViewModel>(),
                         session => session.Id == "session-welcome");
-        var collapsedHeader = viewModel.SessionRows.OfType<SessionGroupHeaderViewModel>()
+        var collapsedHeader = viewModel.Sidebar.SessionRows.OfType<SessionGroupHeaderViewModel>()
                                        .Single(header => header.Key == "ws-main");
         Assert.False(collapsedHeader.IsExpanded);
         Assert.Equal("2 个会话", collapsedHeader.CountText);
 
         // 切回单列表再切回分组：收起状态按分组键保留。
-        viewModel.SessionListModeIndex = 0;
-        viewModel.SessionListModeIndex = 1;
-        Assert.False(viewModel.SessionRows.OfType<SessionGroupHeaderViewModel>()
+        viewModel.Sidebar.SessionListModeIndex = 0;
+        viewModel.Sidebar.SessionListModeIndex = 1;
+        Assert.False(viewModel.Sidebar.SessionRows.OfType<SessionGroupHeaderViewModel>()
                               .Single(header => header.Key == "ws-main")
                               .IsExpanded);
 
@@ -920,29 +920,27 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
     [Fact]
     public async Task NewSessionAppearsUnderUngroupedAndStaysSelected()
     {
-        var workspaces = new StaticWorkspaceService(
-        [
-            new WorkspaceSummary("ws-main", "主工作区", "C:/Code/Main", ["session-native"],
-                                 DateTimeOffset.Now)
+        var workspaces = new StaticWorkspaceService([
+            new WorkspaceSummary("ws-main", "主工作区", "C:/Code/Main", ["session-native"], DateTimeOffset.Now)
         ]);
         var viewModel = new MainWindowViewModel(new SimulatedSessionService(), new SimulatedBackendStatusService(),
                                                 workspaces);
         await viewModel.InitializeAsync();
-        await WaitUntilAsync(() => viewModel.Sessions.Count > 0);
-        viewModel.SessionListModeIndex = 1;
+        await WaitUntilAsync(() => viewModel.Sidebar.Sessions.Count > 0);
+        viewModel.Sidebar.SessionListModeIndex = 1;
 
         var previous = viewModel.SelectedSession;
-        viewModel.NewSessionCommand.Execute(null);
+        viewModel.Sidebar.NewSessionCommand.Execute(null);
         await WaitUntilAsync(() => !ReferenceEquals(viewModel.SelectedSession, previous));
 
-        var ungroupedHeader = viewModel.SessionRows.OfType<SessionGroupHeaderViewModel>()
+        var ungroupedHeader = viewModel.Sidebar.SessionRows.OfType<SessionGroupHeaderViewModel>()
                                        .Single(header => header.Key == "$ungrouped");
-        var firstUngrouped = viewModel.SessionRows.OfType<SessionItemViewModel>()
+        var firstUngrouped = viewModel.Sidebar.SessionRows.OfType<SessionItemViewModel>()
                                       .First(session => session.Id == viewModel.SelectedSession!.Id);
         // 新会话位于未分组顶部（最新更新时间），且实例即当前选中。
         Assert.Same(viewModel.SelectedSession, firstUngrouped);
-        Assert.Equal(0, viewModel.SessionRows.IndexOf(firstUngrouped) - viewModel.SessionRows.IndexOf(ungroupedHeader) -
-                        1);
+        Assert.Equal(0, viewModel.Sidebar.SessionRows.IndexOf(firstUngrouped)  -
+                        viewModel.Sidebar.SessionRows.IndexOf(ungroupedHeader) - 1);
         Assert.True(firstUngrouped.IsCurrent);
 
         await viewModel.DisposeAsync();
@@ -955,23 +953,21 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         var viewModel = new MainWindowViewModel(new SimulatedSessionService(), new SimulatedBackendStatusService(),
                                                 workspaces);
         await viewModel.InitializeAsync();
-        await WaitUntilAsync(() => viewModel.Sessions.Count > 0);
-        viewModel.SessionListModeIndex = 1;
+        await WaitUntilAsync(() => viewModel.Sidebar.Sessions.Count > 0);
+        viewModel.Sidebar.SessionListModeIndex = 1;
 
         // 基线未到达时只有未分组一组。
-        Assert.Single(viewModel.SessionRows.OfType<SessionGroupHeaderViewModel>(),
+        Assert.Single(viewModel.Sidebar.SessionRows.OfType<SessionGroupHeaderViewModel>(),
                       header => header.TitleText == "未分组");
 
-        workspaces.Replace(
-        [
-            new WorkspaceSummary("ws-late", "后到的工作区", "C:/Code/Late", ["session-welcome"],
-                                 DateTimeOffset.Now)
+        workspaces.Replace([
+            new WorkspaceSummary("ws-late", "后到的工作区", "C:/Code/Late", ["session-welcome"], DateTimeOffset.Now)
         ]);
         workspaces.RaiseChanged();
 
-        await WaitUntilAsync(() => viewModel.SessionRows.OfType<SessionGroupHeaderViewModel>()
+        await WaitUntilAsync(() => viewModel.Sidebar.SessionRows.OfType<SessionGroupHeaderViewModel>()
                                             .Any(header => header.TitleText == "后到的工作区"));
-        var shape = viewModel.SessionRows.Select(row => row switch
+        var shape = viewModel.Sidebar.SessionRows.Select(row => row switch
                               {
                                   SessionGroupHeaderViewModel header => $"header:{header.TitleText}",
                                   SessionItemViewModel session       => $"session:{session.Id}",
@@ -994,15 +990,15 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         var viewModel = new MainWindowViewModel(sessionService, new SimulatedBackendStatusService(),
                                                 new StaticWorkspaceService());
         await viewModel.InitializeAsync();
-        await WaitUntilAsync(() => viewModel.Sessions.Count > 0);
-        viewModel.SessionListModeIndex = 0;
+        await WaitUntilAsync(() => viewModel.Sidebar.Sessions.Count > 0);
+        viewModel.Sidebar.SessionListModeIndex = 0;
         var selectedBefore = viewModel.SelectedSession;
 
         // 后台新增并发送消息的会话（SessionsChanged → 延迟合并刷新）：选中实例不变，
         // 但行投影必须重建出新会话（回归：提前 return 曾跳过重建）。
         var created = await sessionService.CreateSessionAsync();
         await sessionService.SendPromptAsync(created.Id, "background-request", "后台消息");
-        await WaitUntilAsync(() => viewModel.SessionRows.OfType<SessionItemViewModel>()
+        await WaitUntilAsync(() => viewModel.Sidebar.SessionRows.OfType<SessionItemViewModel>()
                                             .Any(session => session.Id == created.Id));
         Assert.Same(selectedBefore, viewModel.SelectedSession);
         Assert.True(selectedBefore!.IsCurrent);
@@ -1020,16 +1016,16 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         await WaitUntilAsync(() => viewModel.SelectedSession is not null);
 
         var historicalBlank = await sessionService.CreateSessionAsync();
-        await WaitUntilAsync(() => viewModel.Sessions.All(session => session.Id != historicalBlank.Id));
+        await WaitUntilAsync(() => viewModel.Sidebar.Sessions.All(session => session.Id != historicalBlank.Id));
 
         var previousSelection = viewModel.SelectedSession;
-        viewModel.NewSessionCommand.Execute(null);
+        viewModel.Sidebar.NewSessionCommand.Execute(null);
         await WaitUntilAsync(() => !ReferenceEquals(viewModel.SelectedSession, previousSelection));
         var currentBlank = viewModel.SelectedSession!;
-        Assert.Contains(viewModel.Sessions, session => session.Id == currentBlank.Id);
+        Assert.Contains(viewModel.Sidebar.Sessions, session => session.Id == currentBlank.Id);
 
         await sessionService.SendPromptAsync(currentBlank.Id, "first-request", "第一条消息");
-        await WaitUntilAsync(() => viewModel.Sessions.Any(session => session.Id == currentBlank.Id));
+        await WaitUntilAsync(() => viewModel.Sidebar.Sessions.Any(session => session.Id == currentBlank.Id));
 
         var currentSummary = (await sessionService.GetSessionsAsync()).Single(summary => summary.Id == currentBlank.Id);
         Assert.False(currentSummary.Blank);

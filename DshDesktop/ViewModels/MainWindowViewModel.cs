@@ -10,18 +10,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     /// <summary>整页都被过滤条目（注入上下文）时的连续翻页上限，避免一次触发连环拉取。</summary>
     private const int EmptyPageFollowUpLimit = 4;
 
-    // 会话列表展示：单列表或按工作区分组（对齐参考客户端的视图选项）。
-    private const int SessionListModeFlat        = 0;
-    private const int SessionListModeByWorkspace = 1;
-
-    private const    string              UngroupedKey = "$ungrouped";
     private readonly IBackendHostService _backendHostService;
-    private readonly HashSet<string>     _collapsedGroups = [];
     private readonly Action<Action>      _postToUi;
 
     private readonly ISessionService      _sessionService;
     private readonly IToolApprovalService _toolApprovalService;
-    private readonly IWorkspaceService    _workspaceService;
 
     // 时间线组装状态：快照、增量与翻页共用同一套分组规则。
     private TimelineAssembly _assembly;
@@ -40,12 +33,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private long _historyThroughSeq;
     private bool _isInitialized;
     private bool _isLoadingOlder;
-    private int  _listRefreshPending;
 
     private SessionItemViewModel? _selectedSession;
 
-    // 默认按工作区分组，对齐参考 Web 客户端的默认视图选项。
-    private int                   _sessionListModeIndex = SessionListModeByWorkspace;
     private string?               _streamingAttemptId;
     private MessageItemViewModel? _streamingMessage;
 
@@ -53,8 +43,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private List<ConversationEntry> _timelineEntries = [];
 
     private long _windowStartSeq = 1;
-
-    private IReadOnlyList<WorkspaceSummary> _workspaces = [];
 
     /// <summary>
     ///     保持旧测试与宿主构造调用的兼容性。未提供审批服务时，界面没有审批来源，
@@ -81,48 +69,38 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     {
         _sessionService      = sessionService;
         _backendHostService  = backendHostService;
-        _workspaceService    = workspaceService;
         _toolApprovalService = toolApprovalService;
         IsSimulationMode     = isSimulatedMode;
         _postToUi            = postToUi ?? (action => action());
         // 草稿/发送/取消与模型选择已迁入 Composer；失败仍走窗口级 ErrorText（null 表示清除）。
-        Composer             = new ComposerViewModel(sessionService, text => ErrorText = text ?? string.Empty);
-        NewSessionCommand    = new AsyncRelayCommand(CreateNewSessionAsync);
-        LoadOlderCommand     = new AsyncRelayCommand(LoadOlderAsync, CanLoadOlder);
-        SelectSessionCommand = new RelayCommand<SessionItemViewModel>(session => SelectedSession = session);
-        ToggleGroupCommand   = new RelayCommand<SessionGroupHeaderViewModel>(ToggleGroup);
+        Composer = new ComposerViewModel(sessionService, text => ErrorText = text ?? string.Empty);
+        // 会话列表已迁入 Sidebar：选中切换仍由 root 编排（follow、Composer 与审批随 active
+        // session 联动），Sidebar 只在用户操作或选中缺失/消失时经回调请求切换。
+        Sidebar = new SidebarViewModel(sessionService, workspaceService, session => SelectedSession = session,
+                                       text => ErrorText = text ?? string.Empty, _postToUi);
+        LoadOlderCommand = new AsyncRelayCommand(LoadOlderAsync, CanLoadOlder);
         ApproveApprovalCommand =
             new RelayCommand<PendingApprovalViewModel>(approval => _ = RespondApprovalAsync(approval, true));
         RejectApprovalCommand =
             new RelayCommand<PendingApprovalViewModel>(approval => _ = RespondApprovalAsync(approval, false));
-        _sessionService.SessionsChanged       += OnSessionsChanged;
-        _workspaceService.WorkspacesChanged   += OnWorkspacesChanged;
         _backendHostService.StatusChanged     += OnBackendStatusChanged;
         _toolApprovalService.ApprovalsChanged += OnApprovalsChanged;
         _assembly                             =  CreateAssembly();
         Composer.SetBackendConnected(IsBackendConnected);
     }
 
-    public ObservableCollection<SessionItemViewModel> Sessions { get; } = [];
-
-    /// <summary>会话列表的呈现行：会话行与分组标题行混排，按当前视图模式投影。</summary>
-    public ObservableCollection<object> SessionRows { get; } = [];
-
     public ObservableCollection<ConversationItemViewModel> ConversationItems { get; } = [];
 
     /// <summary>当前选中会话的待决审批（审批横幅）；随审批增删与会话切换重建。</summary>
     public ObservableCollection<PendingApprovalViewModel> SessionPendingApprovals { get; } = [];
 
-    public AsyncRelayCommand NewSessionCommand { get; }
-
     /// <summary>底部输入区子视图模型：草稿、发送/取消与模型选择；会话/后端上下文由本类在状态变化时推送。</summary>
     public ComposerViewModel Composer { get; }
 
+    /// <summary>左侧会话列表子视图模型：条目、分组投影与新建；选中会话由本类持有并推送给它维护高亮。</summary>
+    public SidebarViewModel Sidebar { get; }
+
     public AsyncRelayCommand LoadOlderCommand { get; }
-
-    public RelayCommand<SessionItemViewModel> SelectSessionCommand { get; }
-
-    public RelayCommand<SessionGroupHeaderViewModel> ToggleGroupCommand { get; }
 
     public RelayCommand<PendingApprovalViewModel> ApproveApprovalCommand { get; }
 
@@ -130,16 +108,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
     /// <summary>选中会话是否有待决审批（控制悬浮面板审批横幅区域）。</summary>
     public bool HasSessionPendingApprovals => SessionPendingApprovals.Count > 0;
-
-    /// <summary>会话列表视图模式：0 单列表，1 按工作区。偏好持久化随阶段 4 桌面设置接入。</summary>
-    public int SessionListModeIndex
-    {
-        get => _sessionListModeIndex;
-        set
-        {
-            if (SetProperty(ref _sessionListModeIndex, value)) RebuildSessionRows();
-        }
-    }
 
     public SessionItemViewModel? SelectedSession
     {
@@ -149,26 +117,18 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             var previous = _selectedSession;
             if (SetProperty(ref _selectedSession, value))
             {
-                if (previous is not null)
-                {
-                    previous.PropertyChanged -= OnSelectedSessionPropertyChanged;
-                    previous.IsCurrent       =  false;
-                }
+                if (previous is not null) previous.PropertyChanged -= OnSelectedSessionPropertyChanged;
 
-                if (value is not null)
-                {
-                    value.PropertyChanged += OnSelectedSessionPropertyChanged;
-                    value.IsCurrent       =  true;
-                }
+                if (value is not null) value.PropertyChanged += OnSelectedSessionPropertyChanged;
 
                 // 先重置上一会话的会话级状态再订阅：新会话的当前选型由其快照携带
                 // （模拟实现的快照可能同步到达，先启动订阅再清空会把快照值抹掉）。
                 // SetSession 在会话身份变化时清除上一会话选型与统计并让下拉回退目录默认。
+                // Sidebar 据此维护 IsCurrent 行高亮并重建分组投影（工作区头随选中变化）。
+                Sidebar.ApplySelectedSession(value);
                 Composer.SetSession(value?.Id, value?.Running ?? false);
                 _ = FollowSelectedSessionAsync(value);
                 RebuildSessionPendingApprovals();
-                // 重建行投影：工作区头的 IsCurrent（是否包含当前会话）随选中变化。
-                RebuildSessionRows();
                 OnPropertyChanged(nameof(IsSessionRunning));
                 LoadOlderCommand.RaiseCanExecuteChanged();
             }
@@ -250,8 +210,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
         if (SelectedSession is not null) SelectedSession.PropertyChanged -= OnSelectedSessionPropertyChanged;
 
-        _sessionService.SessionsChanged       -= OnSessionsChanged;
-        _workspaceService.WorkspacesChanged   -= OnWorkspacesChanged;
+        Sidebar.Dispose();
         _backendHostService.StatusChanged     -= OnBackendStatusChanged;
         _toolApprovalService.ApprovalsChanged -= OnApprovalsChanged;
     }
@@ -272,8 +231,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             await _backendHostService.StartAsync(cancellationToken);
             // 工作区订阅先于会话列表启动：基线未到达时先按空投影分组，
             // WorkspacesChanged 事件到达后再重组（对齐参考客户端的 pending 表现）。
-            await RefreshWorkspacesAsync(cancellationToken);
-            await RefreshSessionsAsync(cancellationToken);
+            await Sidebar.RefreshWorkspacesAsync(cancellationToken);
+            await Sidebar.RefreshSessionsAsync(cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -299,109 +258,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             {
                 ErrorText = $"模型目录加载失败：{exception.Message}";
             }
-    }
-
-    private async Task RefreshSessionsAsync(CancellationToken cancellationToken)
-    {
-        var selectedSessionId = SelectedSession?.Id;
-        var summaries = (await _sessionService.GetSessionsAsync(cancellationToken))
-                       .Where(summary => !summary.Blank || summary.Id == selectedSessionId).ToArray();
-
-        // 就地更新既有条目：重建 ObservableCollection 会替换选中实例，
-        // 触发重新订阅并让新快照清掉流式气泡，生成中的内容会闪动。
-        var existingById = Sessions.ToDictionary(session => session.Id);
-        for (var index = Sessions.Count - 1; index >= 0; index--)
-            if (summaries.All(summary => summary.Id != Sessions[index].Id))
-                Sessions.RemoveAt(index);
-
-        var insertIndex = 0;
-        foreach (var summary in summaries)
-        {
-            if (existingById.TryGetValue(summary.Id, out var item))
-            {
-                item.UpdateSummary(summary);
-                var currentIndex = Sessions.IndexOf(item);
-                if (currentIndex != insertIndex) Sessions.Move(currentIndex, insertIndex);
-            }
-            else
-            {
-                Sessions.Insert(insertIndex, new SessionItemViewModel(summary));
-            }
-
-            insertIndex++;
-        }
-
-        if (SelectedSession is not null && existingById.ContainsKey(SelectedSession.Id))
-        {
-            // 选中会话仍存在：实例未变，不触发重订阅；新增/移除/排序变化仍需重建行投影。
-            OnPropertyChanged(nameof(IsSessionRunning));
-            Composer.SetSessionRunning(SelectedSession.Running);
-        }
-        else
-        {
-            var selected = Sessions.FirstOrDefault(session => session.Id == SelectedSession?.Id)
-                        ?? Sessions.FirstOrDefault();
-            if (!ReferenceEquals(SelectedSession, selected))
-            {
-                SelectedSession = selected;
-            }
-            else
-            {
-                OnPropertyChanged(nameof(IsSessionRunning));
-                Composer.SetSessionRunning(SelectedSession?.Running ?? false);
-            }
-        }
-
-        RebuildSessionRows();
-    }
-
-    /// <summary>按当前视图模式把 Sessions 投影为呈现行；分组模式对齐参考客户端投影语义。</summary>
-    private void RebuildSessionRows()
-    {
-        SessionRows.Clear();
-        if (_sessionListModeIndex == SessionListModeFlat)
-        {
-            foreach (var session in Sessions) SessionRows.Add(session);
-
-            return;
-        }
-
-        // 按工作区分组：组序为后端顺序，成员按更新时间降序（参考客户端 orderBy=updated）；
-        // 不被任何工作区记账的会话（含新建空白会话）落入「未分组」，仅在有成员时显示。
-        var accounted = new HashSet<string>();
-        foreach (var workspace in _workspaces)
-            AppendGroup(workspace.Id, workspace.Title,
-                        Sessions.Where(session => workspace.SessionIds.Contains(session.Id)),
-                        accounted);
-
-        AppendGroup(UngroupedKey, "未分组",
-                    Sessions.Where(session => !accounted.Contains(session.Id)),
-                    accounted);
-    }
-
-    private void AppendGroup(
-        string key, string title, IEnumerable<SessionItemViewModel> members, HashSet<string> accounted)
-    {
-        var memberList = members.ToList();
-        if (key == UngroupedKey && memberList.Count == 0) return;
-
-        foreach (var member in memberList) accounted.Add(member.Id);
-
-        var expanded = !_collapsedGroups.Contains(key);
-        SessionRows.Add(new SessionGroupHeaderViewModel(key, title, memberList.Count, expanded, ToggleGroupCommand,
-                                                        memberList.Any(member => member.IsCurrent)));
-        if (expanded)
-            foreach (var member in memberList)
-                SessionRows.Add(member);
-    }
-
-    private void ToggleGroup(SessionGroupHeaderViewModel? header)
-    {
-        if (header is null) return;
-
-        if (!_collapsedGroups.Remove(header.Key)) _collapsedGroups.Add(header.Key);
-
-        RebuildSessionRows();
     }
 
     /// <summary>审批列表变化可能在任一线程到达：回到界面线程重建选中会话的待决投影。</summary>
@@ -432,30 +288,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         try
         {
             await _toolApprovalService.RespondAsync(approval.EventId, allowed);
-        }
-        catch (Exception exception)
-        {
-            ErrorText = exception.Message;
-        }
-    }
-
-    private async Task RefreshWorkspacesAsync(CancellationToken cancellationToken)
-    {
-        _workspaces = await _workspaceService.GetWorkspacesAsync(cancellationToken);
-        RebuildSessionRows();
-    }
-
-    private void OnWorkspacesChanged(object? sender, EventArgs e)
-    {
-        // 后台线程事件：回到界面线程重读投影（工作区变更频率低，不做合并）。
-        _postToUi(() => _ = RefreshWorkspacesSafeAsync());
-    }
-
-    private async Task RefreshWorkspacesSafeAsync()
-    {
-        try
-        {
-            await RefreshWorkspacesAsync(CancellationToken.None);
         }
         catch (Exception exception)
         {
@@ -673,23 +505,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         HasMoreHistory     = false;
     }
 
-    private async Task CreateNewSessionAsync()
-    {
-        try
-        {
-            var summary = await _sessionService.CreateSessionAsync();
-            var session = new SessionItemViewModel(summary);
-            Sessions.Insert(0, session);
-            RebuildSessionRows();
-            SelectedSession = session;
-            ErrorText       = string.Empty;
-        }
-        catch (Exception exception)
-        {
-            ErrorText = exception.Message;
-        }
-    }
-
     private CancellationTokenSource BeginFollow()
     {
         var cancellation = new CancellationTokenSource();
@@ -736,38 +551,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 OnPropertyChanged(nameof(IsSessionRunning));
                 Composer.SetSessionRunning(SelectedSession?.Running ?? false);
             });
-    }
-
-    private void OnSessionsChanged(object? sender, EventArgs e)
-    {
-        // 后台线程事件：合并 400ms 内的重复通知，再回到界面线程刷新列表。
-        if (Interlocked.Exchange(ref _listRefreshPending, 1) == 1) return;
-
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await Task.Delay(400);
-                Interlocked.Exchange(ref _listRefreshPending, 0);
-                _postToUi(() => _ = RefreshSessionsSafeAsync());
-            }
-            catch (Exception)
-            {
-                Interlocked.Exchange(ref _listRefreshPending, 0);
-            }
-        });
-    }
-
-    private async Task RefreshSessionsSafeAsync()
-    {
-        try
-        {
-            await RefreshSessionsAsync(CancellationToken.None);
-        }
-        catch (Exception exception)
-        {
-            ErrorText = exception.Message;
-        }
     }
 
     private void OnBackendStatusChanged(object? sender, EventArgs e)

@@ -25,7 +25,7 @@
                     Margin="0,24,0,10"
                     Classes="new-session"
                     AutomationProperties.Name="新建会话"
-                    Command="{Binding NewSessionCommand}">
+                    Command="{Binding Sidebar.NewSessionCommand}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <Path Width="16" Height="16"
                           Data="M8,1.5 A6.5,6.5 0 1 0 8,14.5 A6.5,6.5 0 1 0 8,1.5 Z M5,8 L11,8 M8,5 L8,11"
@@ -42,7 +42,7 @@
                 <TextBlock Text="会话" Classes="caption" VerticalAlignment="Center" />
                 <ComboBox Grid.Column="1"
                           MinWidth="100"
-                          SelectedIndex="{Binding SessionListModeIndex, Mode=TwoWay}">
+                          SelectedIndex="{Binding Sidebar.SessionListModeIndex, Mode=TwoWay}">
                     <ComboBoxItem Content="单列表" />
                     <ComboBoxItem Content="按工作区" />
                 </ComboBox>
@@ -56,7 +56,7 @@
                           Margin="0,0,-12,0"
                           HorizontalAlignment="Stretch"
                           HorizontalScrollBarVisibility="Disabled">
-                <ItemsControl ItemsSource="{Binding SessionRows}"
+                <ItemsControl ItemsSource="{Binding Sidebar.SessionRows}"
                               HorizontalAlignment="Stretch"
                               Margin="0,0,20,0">
                     <ItemsControl.ItemsPanel>
@@ -70,7 +70,7 @@
                                     Classes.current="{Binding IsCurrent}"
                                     HorizontalAlignment="Stretch"
                                     AutomationProperties.Name="{Binding TitleText}"
-                                    Command="{Binding $parent[sidebar:SidebarView].DataContext.ToggleGroupCommand}"
+                                    Command="{Binding $parent[sidebar:SidebarView].DataContext.Sidebar.ToggleGroupCommand}"
                                     CommandParameter="{Binding}">
                                 <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="4"
                                       HorizontalAlignment="Stretch">
@@ -109,7 +109,7 @@
                                     Classes.current="{Binding IsCurrent}"
                                     HorizontalAlignment="Stretch"
                                     AutomationProperties.Name="{Binding TitleText}"
-                                    Command="{Binding $parent[sidebar:SidebarView].DataContext.SelectSessionCommand}"
+                                    Command="{Binding $parent[sidebar:SidebarView].DataContext.Sidebar.SelectSessionCommand}"
                                     CommandParameter="{Binding}">
                                 <Grid ColumnDefinitions="*,Auto" RowSpacing="5"
                                       HorizontalAlignment="Stretch">
