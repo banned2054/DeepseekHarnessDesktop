@@ -6,7 +6,10 @@ using Xunit;
 
 namespace DshDesktop.Tests;
 
-/// <summary>Composer 纯行为测试：上下文由 SetSession/SetBackendConnected 显式推送，不依赖窗口组装。</summary>
+/// <summary>
+///     Composer 纯行为测试：上下文由 SetSession/SetBackendConnected 显式推送，
+///     生效选型由 ApplyCurrentModel 模拟 follow 回声，不依赖窗口组装。
+/// </summary>
 public sealed class ComposerViewModelTests
 {
     [Fact]
@@ -111,6 +114,162 @@ public sealed class ComposerViewModelTests
         Assert.False(composer.IsSending);
     }
 
+    [Fact]
+    public async Task ModelCatalogRefreshBuildsFlatOptionsWithDefaultFallback()
+    {
+        var composer = CreateComposer();
+
+        await composer.RefreshModelCatalogAsync();
+
+        // 目录扁平投影：两个提供方共三个模型。
+        Assert.Equal(["model-x", "model-y", "model-z"],
+                     composer.ModelOptions.Select(option => option.Model).ToArray());
+
+        // 会话未显式选型：生效选型为空，下拉回退目录默认。
+        Assert.Null(composer.CurrentModel);
+        Assert.Equal("model-x", composer.SelectedModelOption?.Model);
+    }
+
+    [Fact]
+    public async Task ModelPickerRequiresCatalogSessionAndBackendConnection()
+    {
+        var composer = CreateComposer();
+        Assert.False(composer.IsModelPickerEnabled);
+
+        // 目录、会话、连接三个条件逐项到位，并验证各变化点触发可用性重算。
+        var raised = new List<string?>();
+        composer.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        await composer.RefreshModelCatalogAsync();
+        composer.SetBackendConnected(true);
+        Assert.Contains(nameof(ComposerViewModel.IsModelPickerEnabled), raised);
+        Assert.False(composer.IsModelPickerEnabled); // 尚无会话。
+
+        composer.SetSession("session-1", isRunning : false);
+        Assert.True(composer.IsModelPickerEnabled);
+
+        composer.SetBackendConnected(false);
+        Assert.False(composer.IsModelPickerEnabled);
+
+        composer.SetBackendConnected(true);
+        composer.SetSession(null, isRunning : false);
+        Assert.False(composer.IsModelPickerEnabled);
+    }
+
+    [Fact]
+    public async Task ApplyCurrentModelEchoUpdatesPickerSelection()
+    {
+        var composer = CreateComposer();
+        await composer.RefreshModelCatalogAsync();
+        composer.SetSession("session-1", isRunning : false);
+
+        composer.ApplyCurrentModel(new ModelSelection("prov-b", "model-z"));
+
+        Assert.Equal(new ModelSelection("prov-b", "model-z"), composer.CurrentModel);
+        Assert.Equal("model-z", composer.SelectedModelOption?.Model);
+    }
+
+    [Fact]
+    public async Task UserSelectionSendsRequestToSessionAndTakesEffectViaEcho()
+    {
+        var sessionService = new ControllableSessionService();
+        var composer       = new ComposerViewModel(sessionService, _ => { });
+        await composer.RefreshModelCatalogAsync();
+        composer.SetSession("session-1", isRunning : false);
+
+        composer.SelectedModelOption = composer.ModelOptions.Single(option => option.Model == "model-y");
+
+        // 请求发往当前会话；回声到达前本地生效值不变。
+        Assert.Equal(("session-1", "prov-a", "model-y"), Assert.Single(sessionService.SelectionRequests));
+        Assert.Null(composer.CurrentModel);
+
+        // 与当前生效选型的守卫在下次请求时生效；同一项重复赋值不触发新请求。
+        composer.SelectedModelOption = composer.ModelOptions.Single(option => option.Model == "model-y");
+        Assert.Single(sessionService.SelectionRequests);
+
+        // 生效值以后端回声为准。
+        composer.ApplyCurrentModel(new ModelSelection("prov-a", "model-y"));
+        Assert.Equal("model-y", composer.SelectedModelOption?.Model);
+    }
+
+    [Fact]
+    public async Task FailedSelectionRollsBackPickerAndReportsError()
+    {
+        var     sessionService = new ControllableSessionService { FailSelect = true };
+        string? reported       = null;
+        var     composer       = new ComposerViewModel(sessionService, text => reported = text);
+        await composer.RefreshModelCatalogAsync();
+        composer.SetSession("session-1", isRunning : false);
+
+        composer.SelectedModelOption = composer.ModelOptions.Single(option => option.Model == "model-z");
+        await WaitUntilAsync(() => reported is not null);
+
+        Assert.Contains("选型失败", reported, StringComparison.Ordinal);
+        // 回退到当前生效选型（会话未选型 → 目录默认），不停留在失败项。
+        Assert.Equal("model-x", composer.SelectedModelOption?.Model);
+    }
+
+    [Fact]
+    public async Task CurrentModelOutsideCatalogGetsPlaceholderOption()
+    {
+        var composer = CreateComposer();
+        await composer.RefreshModelCatalogAsync();
+        composer.SetSession("session-1", isRunning : false);
+
+        composer.ApplyCurrentModel(new ModelSelection("prov-ghost", "model-ghost"));
+
+        // 目录不含该选型：补占位项并选中，下拉仍显示真实后端选型。
+        Assert.Equal("model-ghost", composer.SelectedModelOption?.Model);
+        Assert.Contains(composer.ModelOptions, option => option.Model == "model-ghost");
+        Assert.Equal(4, composer.ModelOptions.Count);
+    }
+
+    [Fact]
+    public async Task SessionSwitchClearsCurrentModelAndFallsBackToCatalogDefault()
+    {
+        var composer = CreateComposer();
+        await composer.RefreshModelCatalogAsync();
+        composer.SetSession("session-a", isRunning : false);
+        composer.ApplyCurrentModel(new ModelSelection("prov-b", "model-z"));
+
+        // 切换会话：保留已加载目录，清除上一会话选型，下拉回退目录默认。
+        composer.SetSession("session-b", isRunning : false);
+        Assert.Null(composer.CurrentModel);
+        Assert.Equal("model-x", composer.SelectedModelOption?.Model);
+        Assert.Equal(3, composer.ModelOptions.Count);
+
+        // 新会话的真实选型由其快照携带，随后接管显示。
+        composer.ApplyCurrentModel(new ModelSelection("prov-a", "model-y"));
+        Assert.Equal("model-y", composer.SelectedModelOption?.Model);
+    }
+
+    [Fact]
+    public async Task StaleSelectionCompletionDoesNotPolluteSwitchedSessionPicker()
+    {
+        var     sessionService = new ControllableSessionService { BlockSelect = true, FailSelect = true };
+        string? reported       = null;
+        var     composer       = new ComposerViewModel(sessionService, text => reported = text);
+        await composer.RefreshModelCatalogAsync();
+        composer.SetSession("session-a", isRunning : false);
+        composer.SetBackendConnected(true);
+
+        // session A 发起选型（生效默认 model-x → 目标 model-y），请求在途。
+        composer.SelectedModelOption = composer.ModelOptions.Single(option => option.Model == "model-y");
+        await sessionService.SelectStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        // 切到 session B，其快照选型到达。
+        composer.SetSession("session-b", isRunning : false);
+        composer.ApplyCurrentModel(new ModelSelection("prov-b", "model-z"));
+        Assert.Equal("model-z", composer.SelectedModelOption?.Model);
+
+        // A 的请求此时失败：错误照常上报，但回退读取当前生效选型（B 的），
+        // 不得把 B 的下拉拉回 A 请求时的目标或目录默认。
+        sessionService.ReleaseSelect.TrySetResult();
+        await WaitUntilAsync(() => reported is not null);
+        Assert.Contains("选型失败", reported, StringComparison.Ordinal);
+        Assert.Equal("model-z", composer.SelectedModelOption?.Model);
+    }
+
     private static ComposerViewModel CreateComposer()
     {
         return new ComposerViewModel(new ControllableSessionService(), _ => { });
@@ -129,7 +288,10 @@ public sealed class ComposerViewModelTests
         Assert.True(condition(), "预期的异步 Composer 状态未在超时前出现。");
     }
 
-    /// <summary>可控发送/取消桩：其余行为走模拟实现，发送可阻塞到手动放行，取消记录目标会话。</summary>
+    /// <summary>
+    ///     可控桩：其余行为走模拟实现。发送/选型可阻塞到手动放行并可注入失败，
+    ///     取消与选型请求记录目标会话，模型目录可整体替换。
+    /// </summary>
     private sealed class ControllableSessionService : ISessionService
     {
         private readonly SimulatedSessionService _inner = new();
@@ -138,9 +300,30 @@ public sealed class ComposerViewModelTests
 
         public TaskCompletionSource ReleaseSend { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        public TaskCompletionSource SelectStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource ReleaseSelect { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public List<string> CancelledSessions { get; } = [];
 
+        public List<(string SessionId, string Provider, string Model)> SelectionRequests { get; } = [];
+
         public bool FailSend { get; set; }
+
+        public bool FailSelect { get; set; }
+
+        /// <summary>选型请求是否阻塞到手动放行；默认立即完成。</summary>
+        public bool BlockSelect { get; set; }
+
+        /// <summary>测试目录：默认 prov-a/model-x，两个提供方共三个模型。</summary>
+        public ModelCatalog Catalog { get; set; } = new(new ModelSelection("prov-a", "model-x"),
+        [
+            new ModelProviderGroup("prov-a", "Provider A",
+            [
+                new ModelCatalogEntry("model-x", "Model X"), new ModelCatalogEntry("model-y", "Model Y")
+            ]),
+            new ModelProviderGroup("prov-b", "Provider B", [new ModelCatalogEntry("model-z", "Model Z")])
+        ], []);
 
         public event EventHandler? SessionsChanged
         {
@@ -160,13 +343,23 @@ public sealed class ComposerViewModelTests
 
         public Task<ModelCatalog> GetModelCatalogAsync(CancellationToken cancellationToken = default)
         {
-            return _inner.GetModelCatalogAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(Catalog);
         }
 
-        public Task<ModelSelection> SelectModelAsync(
+        public async Task<ModelSelection> SelectModelAsync(
             string sessionId, string provider, string model, CancellationToken cancellationToken = default)
         {
-            return _inner.SelectModelAsync(sessionId, provider, model, cancellationToken);
+            // 只记录请求并模拟后端应答，不落到模拟实现：目标会话不必存在于演示数据，
+            // Composer 级测试不依赖选型副作用（回声由测试显式 ApplyCurrentModel 模拟）。
+            SelectionRequests.Add((sessionId, provider, model));
+            SelectStarted.TrySetResult();
+            if (BlockSelect) await ReleaseSelect.Task.WaitAsync(cancellationToken);
+
+            if (FailSelect) throw new InvalidOperationException("选型失败（模拟）");
+
+            cancellationToken.ThrowIfCancellationRequested();
+            return new ModelSelection(provider, model);
         }
 
         public Task<IReadOnlyList<ConversationMessage>> GetMessagesAsync(
@@ -188,13 +381,14 @@ public sealed class ComposerViewModelTests
             if (FailSend) throw new InvalidOperationException("发送失败（模拟）");
 
             await ReleaseSend.Task.WaitAsync(cancellationToken);
-            await _inner.SendPromptAsync(sessionId, requestId, content, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
         }
 
         public Task CancelAsync(string sessionId, CancellationToken cancellationToken = default)
         {
             CancelledSessions.Add(sessionId);
-            return _inner.CancelAsync(sessionId, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
         }
 
         public IAsyncEnumerable<SessionUpdate> FollowSessionAsync(

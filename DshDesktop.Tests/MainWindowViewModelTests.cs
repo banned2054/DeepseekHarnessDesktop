@@ -232,12 +232,12 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         await viewModel.InitializeAsync();
 
         // 目录扁平投影：两个提供方共三个模型。
-        await WaitUntilAsync(() => viewModel.ModelOptions.Count == 3);
-        Assert.True(viewModel.IsModelPickerEnabled);
+        await WaitUntilAsync(() => viewModel.Composer.ModelOptions.Count == 3);
+        Assert.True(viewModel.Composer.IsModelPickerEnabled);
 
         // 默认选中最新会话（session-history，预置 sim/sim-chat）：快照投影生效。
-        await WaitUntilAsync(() => viewModel.SelectedModelOption is { Provider: "sim", Model: "sim-chat" });
-        Assert.Equal(new ModelSelection("sim", "sim-chat"), viewModel.CurrentModel);
+        await WaitUntilAsync(() => viewModel.Composer.SelectedModelOption is { Provider: "sim", Model: "sim-chat" });
+        Assert.Equal(new ModelSelection("sim", "sim-chat"), viewModel.Composer.CurrentModel);
 
         await viewModel.DisposeAsync();
     }
@@ -251,18 +251,18 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         await viewModel.InitializeAsync();
         await WaitUntilAsync(() => viewModel.SelectedSession is not null);
 
-        var reasoner = viewModel.ModelOptions.Single(option => option.Model == "alt-chat");
-        viewModel.SelectedModelOption = reasoner;
+        var reasoner = viewModel.Composer.ModelOptions.Single(option => option.Model == "alt-chat");
+        viewModel.Composer.SelectedModelOption = reasoner;
 
         // 选型经 follow 流的 model/selection 回声生效（后端权威）。
-        await WaitUntilAsync(() => viewModel.CurrentModel is { Provider: "sim-alt", Model: "alt-chat" });
-        Assert.Same(reasoner, viewModel.SelectedModelOption);
+        await WaitUntilAsync(() => viewModel.Composer.CurrentModel is { Provider: "sim-alt", Model: "alt-chat" });
+        Assert.Same(reasoner, viewModel.Composer.SelectedModelOption);
         Assert.False(viewModel.HasError);
 
         // 切换会话：另一会话的快照携带各自的当前选型。
         viewModel.SelectedSession = viewModel.Sessions.First(session => session.Id == "session-native");
-        await WaitUntilAsync(() => viewModel.SelectedSession!.Id == "session-native" && viewModel.CurrentModel is
-                                 { Provider: "sim", Model: "sim-reasoner" });
+        await WaitUntilAsync(() => viewModel.SelectedSession!.Id == "session-native"
+                                && viewModel.Composer.CurrentModel is { Provider: "sim", Model: "sim-reasoner" });
         Assert.False(viewModel.HasError);
 
         await viewModel.DisposeAsync();
@@ -275,13 +275,14 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         var backendService = new SimulatedBackendStatusService();
         var viewModel      = new MainWindowViewModel(sessionService, backendService, new StaticWorkspaceService());
         await viewModel.InitializeAsync();
-        await WaitUntilAsync(() => viewModel.SelectedModelOption is { Model: "sim-chat" });
+        await WaitUntilAsync(() => viewModel.Composer.SelectedModelOption is { Model: "sim-chat" });
 
-        viewModel.SelectedModelOption = viewModel.ModelOptions.Single(option => option.Model == "alt-chat");
+        viewModel.Composer.SelectedModelOption =
+            viewModel.Composer.ModelOptions.Single(option => option.Model == "alt-chat");
         await WaitUntilAsync(() => viewModel.HasError);
 
         // 失败后回退到当前生效选型的显示，不停留在失败项。
-        await WaitUntilAsync(() => viewModel.SelectedModelOption is { Model: "sim-chat" });
+        await WaitUntilAsync(() => viewModel.Composer.SelectedModelOption is { Model: "sim-chat" });
         Assert.Contains("选型失败", viewModel.ErrorText, StringComparison.Ordinal);
 
         await viewModel.DisposeAsync();

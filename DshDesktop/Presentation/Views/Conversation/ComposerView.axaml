@@ -52,9 +52,9 @@
                               Classes="model-picker"
                               HorizontalAlignment="Right"
                               VerticalAlignment="Center"
-                              ItemsSource="{Binding ModelOptions}"
-                              SelectedItem="{Binding SelectedModelOption, Mode=TwoWay}"
-                              IsEnabled="{Binding IsModelPickerEnabled}"
+                              ItemsSource="{Binding Composer.ModelOptions}"
+                              SelectedItem="{Binding Composer.SelectedModelOption, Mode=TwoWay}"
+                              IsEnabled="{Binding Composer.IsModelPickerEnabled}"
                               ToolTip.Tip="切换当前会话的模型">
                         <ComboBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:ModelOptionViewModel">

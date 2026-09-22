@@ -26,7 +26,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
     // 时间线组装状态：快照、增量与翻页共用同一套分组规则。
     private TimelineAssembly _assembly;
-    private ModelSelection?  _currentModel;
     private string           _errorText = string.Empty;
 
     private CancellationTokenSource? _followCancellation;
@@ -42,12 +41,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private long _historyThroughSeq;
     private bool _isInitialized;
     private bool _isLoadingOlder;
-    private bool _isSelectingModel;
     private int  _listRefreshPending;
 
-    // 模型选择：目录为全局只读快照，当前选型随会话 follow 流回声更新（后端权威）。
-    private ModelCatalog?         _modelCatalog;
-    private ModelOptionViewModel? _selectedModelOption;
     private SessionItemViewModel? _selectedSession;
 
     // 默认按工作区分组，对齐参考 Web 客户端的默认视图选项。
@@ -61,10 +56,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     private List<ConversationEntry> _timelineEntries = [];
 
     // 会话统计：快照投影基线 + control 流整值更新，均带投影 seq 做乱序 gating。
-    private SessionUsage?                   _usage;
-    private long                            _usageSeq;
-    private long                            _windowStartSeq = 1;
-    private IReadOnlyList<WorkspaceSummary> _workspaces     = [];
+    private SessionUsage? _usage;
+    private long          _usageSeq;
+    private long          _windowStartSeq = 1;
+
+    private IReadOnlyList<WorkspaceSummary> _workspaces = [];
 
     /// <summary>
     ///     保持旧测试与宿主构造调用的兼容性。未提供审批服务时，界面没有审批来源，
@@ -95,7 +91,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _toolApprovalService = toolApprovalService;
         IsSimulationMode     = isSimulatedMode;
         _postToUi            = postToUi ?? (action => action());
-        // 草稿/发送/取消已迁入 Composer；失败仍走窗口级 ErrorText（null 表示清除）。
+        // 草稿/发送/取消与模型选择已迁入 Composer；失败仍走窗口级 ErrorText（null 表示清除）。
         Composer             = new ComposerViewModel(sessionService, text => ErrorText = text ?? string.Empty);
         NewSessionCommand    = new AsyncRelayCommand(CreateNewSessionAsync);
         LoadOlderCommand     = new AsyncRelayCommand(LoadOlderAsync, CanLoadOlder);
@@ -120,15 +116,12 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
     public ObservableCollection<ConversationItemViewModel> ConversationItems { get; } = [];
 
-    /// <summary>模型下拉可选项：目录扁平投影；当前选型不在目录中时补一项占位。</summary>
-    public ObservableCollection<ModelOptionViewModel> ModelOptions { get; } = [];
-
     /// <summary>当前选中会话的待决审批（审批横幅）；随审批增删与会话切换重建。</summary>
     public ObservableCollection<PendingApprovalViewModel> SessionPendingApprovals { get; } = [];
 
     public AsyncRelayCommand NewSessionCommand { get; }
 
-    /// <summary>底部输入区子视图模型：草稿与发送/取消；会话/后端上下文由本类在状态变化时推送。</summary>
+    /// <summary>底部输入区子视图模型：草稿、发送/取消与模型选择；会话/后端上下文由本类在状态变化时推送。</summary>
     public ComposerViewModel Composer { get; }
 
     public AsyncRelayCommand LoadOlderCommand { get; }
@@ -174,53 +167,23 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                     value.IsCurrent       =  true;
                 }
 
-                // 先清空上一会话的选型再订阅：新会话的当前选型由其快照携带
+                // 先重置上一会话的会话级状态再订阅：新会话的当前选型由其快照携带
                 // （模拟实现的快照可能同步到达，先启动订阅再清空会把快照值抹掉）。
-                CurrentModel = null;
-                Usage        = null;
-                Stats        = null;
-                _usageSeq    = 0;
-                _statsSeq    = 0;
-                _            = FollowSelectedSessionAsync(value);
+                // SetSession 在会话身份变化时清除上一会话选型并让下拉回退目录默认。
+                Usage     = null;
+                Stats     = null;
+                _usageSeq = 0;
+                _statsSeq = 0;
+                Composer.SetSession(value?.Id, value?.Running ?? false);
+                _ = FollowSelectedSessionAsync(value);
                 RebuildSessionPendingApprovals();
                 // 重建行投影：工作区头的 IsCurrent（是否包含当前会话）随选中变化。
                 RebuildSessionRows();
-                Composer.SetSession(value?.Id, value?.Running ?? false);
                 OnPropertyChanged(nameof(IsSessionRunning));
-                OnPropertyChanged(nameof(IsModelPickerEnabled));
                 LoadOlderCommand.RaiseCanExecuteChanged();
             }
         }
     }
-
-    /// <summary>当前会话生效的模型选型；由 follow 流的快照投影与 model/selection 回声更新。</summary>
-    public ModelSelection? CurrentModel
-    {
-        get => _currentModel;
-        private set
-        {
-            if (SetProperty(ref _currentModel, value)) SyncSelectedModelOption();
-        }
-    }
-
-    /// <summary>
-    ///     下拉选中项；用户改动即发起选型。生效值仍以后端回声为准，失败时回退显示。
-    /// </summary>
-    public ModelOptionViewModel? SelectedModelOption
-    {
-        get => _selectedModelOption;
-        set
-        {
-            if (SetProperty(ref _selectedModelOption, value) && value is not null) _ = SelectModelAsync(value);
-        }
-    }
-
-    /// <summary>下拉是否可用：目录已加载、有选中会话且后端已连接。</summary>
-    public bool IsModelPickerEnabled
-        => ModelOptions.Count > 0 && SelectedSession is not null && IsBackendConnected;
-
-    /// <summary>展示用生效选型：会话未选过型时回退目录默认。</summary>
-    private ModelSelection? EffectiveModel => _currentModel ?? _modelCatalog?.Default;
 
     /// <summary>当前会话累计 token 计量（whole-log 投影；无数据时为 null）。</summary>
     public SessionUsage? Usage
@@ -390,87 +353,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _toolApprovalService.ApprovalsChanged -= OnApprovalsChanged;
     }
 
-    private async Task SelectModelAsync(ModelOptionViewModel option)
-    {
-        // 与当前生效选型相同、无会话或已有选型在途：回退显示，不重复请求。
-        if (SelectedSession is null || _isSelectingModel
-                                    || (EffectiveModel is { } effective && option.Matches(effective)))
-        {
-            SyncSelectedModelOption();
-            return;
-        }
-
-        _isSelectingModel = true;
-        try
-        {
-            // 生效值以 follow 流的 model/selection 回声为准（模拟实现同路径）。
-            await _sessionService.SelectModelAsync(SelectedSession.Id, option.Provider, option.Model);
-        }
-        catch (Exception exception)
-        {
-            ErrorText = exception.Message;
-            SyncSelectedModelOption();
-        }
-        finally
-        {
-            _isSelectingModel = false;
-        }
-    }
-
-    /// <summary>把下拉选中项对齐到生效选型；目录不含该选型时先补占位项。</summary>
-    private void SyncSelectedModelOption()
-    {
-        var effective = EffectiveModel;
-        if (effective is null)
-        {
-            _selectedModelOption = null;
-            OnPropertyChanged(nameof(SelectedModelOption));
-            return;
-        }
-
-        var match = ModelOptions.FirstOrDefault(option => option.Matches(effective));
-        if (match is null)
-        {
-            match = new ModelOptionViewModel(effective.Provider, effective.Provider,
-                                             effective.Model, effective.Model);
-            ModelOptions.Insert(0, match);
-        }
-
-        _selectedModelOption = match;
-        OnPropertyChanged(nameof(SelectedModelOption));
-    }
-
-    /// <summary>目录变化时重建下拉选项（当前生效选型保持可选）。</summary>
-    private void RebuildModelOptions()
-    {
-        ModelOptions.Clear();
-        if (_modelCatalog is { } catalog)
-            foreach (var group in catalog.Groups)
-            foreach (var model in group.Models)
-                ModelOptions.Add(new ModelOptionViewModel(group.Id, group.Name, model.Id, model.Name));
-
-        OnPropertyChanged(nameof(IsModelPickerEnabled));
-        SyncSelectedModelOption();
-    }
-
-    private async Task RefreshModelCatalogAsync(CancellationToken cancellationToken)
-    {
-        _modelCatalog = await _sessionService.GetModelCatalogAsync(cancellationToken);
-        RebuildModelOptions();
-    }
-
-    private async Task RefreshModelCatalogSafeAsync()
-    {
-        try
-        {
-            await RefreshModelCatalogAsync(CancellationToken.None);
-        }
-        catch (Exception exception)
-        {
-            ErrorText = $"模型目录加载失败：{exception.Message}";
-        }
-    }
-
     /// <summary>呈现组合阶段发现的问题（例如真实后端配置缺失回退模拟）。</summary>
     public void ShowStartupNotice(string text)
     {
@@ -504,7 +386,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         if (IsBackendConnected)
             try
             {
-                await RefreshModelCatalogAsync(cancellationToken);
+                await Composer.RefreshModelCatalogAsync(cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -743,7 +625,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 _windowStartSeq    = snapshot.WindowStartSeq;
                 HasMoreHistory     = snapshot.HasMore;
                 SelectedSession?.AdoptTitle(snapshot.Title);
-                CurrentModel = snapshot.CurrentModel;
+                Composer.ApplyCurrentModel(snapshot.CurrentModel);
                 break;
 
             case SessionUpdate.MessageAppended appended :
@@ -774,7 +656,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 break;
 
             case SessionUpdate.ModelSelected selected :
-                CurrentModel = selected.Selection;
+                Composer.ApplyCurrentModel(selected.Selection);
                 break;
 
             // 统计整值更新带投影 seq：乱序到达的旧值（重连竞态）直接忽略。
@@ -996,12 +878,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             OnPropertyChanged(nameof(HasBackendError));
             OnPropertyChanged(nameof(IsBackendConnected));
             OnPropertyChanged(nameof(IsBackendDisconnected));
-            OnPropertyChanged(nameof(IsModelPickerEnabled));
             Composer.SetBackendConnected(IsBackendConnected);
             LoadOlderCommand.RaiseCanExecuteChanged();
             if (IsBackendConnected)
                 // 重连后代目录可能变化，重新拉取（只读，可安全重试）。
-                _ = RefreshModelCatalogSafeAsync();
+                _ = Composer.RefreshModelCatalogSafeAsync();
         });
     }
 
