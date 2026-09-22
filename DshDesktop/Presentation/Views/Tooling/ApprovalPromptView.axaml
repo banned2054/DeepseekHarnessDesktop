@@ -1,0 +1,38 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:DshDesktop.ViewModels"
+             x:Class="DshDesktop.Presentation.Views.Tooling.ApprovalPromptView"
+             x:DataType="vm:PendingApprovalViewModel"
+             mc:Ignorable="d"
+             d:DesignHeight="120" d:DesignWidth="480">
+    <!-- 审批横幅：选中会话的待决 approval/request 条目，裁决经 $events/result 回执；
+         裁决命令由 MainWindowViewModel 注入条目自身（见 PendingApprovalViewModel）。 -->
+    <Border Classes="approval-banner" Margin="0,0,0,4">
+        <StackPanel Spacing="7">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                         Fill="{DynamicResource StatusRunningBrush}" />
+                <TextBlock Text="等待授权" FontSize="12" FontWeight="SemiBold"
+                           Foreground="{DynamicResource StatusRunningBrush}"
+                           VerticalAlignment="Center" />
+                <TextBlock Text="{Binding ToolNameText}" Classes="tool-mono"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Text="{Binding HeadlineText}" FontSize="13"
+                       TextWrapping="Wrap" />
+            <StackPanel Orientation="Horizontal" Spacing="8"
+                        HorizontalAlignment="Right">
+                <Button Classes="approval-reject"
+                        Content="拒绝"
+                        Command="{Binding RejectCommand}"
+                        CommandParameter="{Binding}" />
+                <Button Classes="approval-allow"
+                        Content="允许一次"
+                        Command="{Binding ApproveCommand}"
+                        CommandParameter="{Binding}" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

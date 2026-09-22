@@ -1,0 +1,54 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- 会话时间线样式：消息气泡、思考折叠体、历史分页与轻量切换按钮。 -->
+
+    <Style Selector="Border.message-bubble">
+        <Setter Property="MaxWidth" Value="760" />
+        <Setter Property="Padding" Value="14,11" />
+        <Setter Property="CornerRadius" Value="14" />
+    </Style>
+    <Style Selector="Border.user-bubble">
+        <Setter Property="HorizontalAlignment" Value="Right" />
+        <Setter Property="Background" Value="{DynamicResource UserBubbleBrush}" />
+    </Style>
+    <!-- 助手回复不用气泡底色，直接融入聊天背景；仅保留对齐与可读宽度。 -->
+    <Style Selector="Border.assistant-bubble">
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.system-bubble">
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="Background" Value="{DynamicResource PanelBackgroundBrush}" />
+    </Style>
+    <Style Selector="TextBlock.reason-body">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+    </Style>
+    <!-- 历史分页按钮：对齐参考 Web 客户端的「加载更早」手动分页。 -->
+    <Style Selector="Button.load-older">
+        <Setter Property="Padding" Value="16,6" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+        <Setter Property="Background" Value="{DynamicResource PanelBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.load-older:pointerover">
+        <Setter Property="Background" Value="{DynamicResource SessionHoverBrush}" />
+    </Style>
+    <!-- 轻量切换按钮：工具卡详情、思考折叠、过程组折叠共用的小号幽灵按钮。 -->
+    <Style Selector="Button.tool-toggle">
+        <Setter Property="Padding" Value="8,3" />
+        <Setter Property="CornerRadius" Value="5" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Focusable" Value="False" />
+    </Style>
+    <Style Selector="Button.tool-toggle:pointerover">
+        <Setter Property="Background" Value="{DynamicResource SessionHoverBrush}" />
+    </Style>
+</Styles>

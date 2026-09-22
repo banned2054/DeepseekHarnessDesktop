@@ -9,6 +9,7 @@ using DshDesktop.Harness.Services.Sessions;
 using DshDesktop.Harness.Services.Workspaces;
 using DshDesktop.Infrastructure.Services;
 using DshDesktop.Infrastructure.Services.Backend;
+using DshDesktop.Presentation.Views;
 using DshDesktop.Services.Backend;
 using DshDesktop.ViewModels;
 

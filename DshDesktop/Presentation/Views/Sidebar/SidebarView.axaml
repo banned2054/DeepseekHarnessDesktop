@@ -1,0 +1,161 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:DshDesktop.ViewModels"
+             xmlns:sidebar="using:DshDesktop.Presentation.Views.Sidebar"
+             x:Class="DshDesktop.Presentation.Views.Sidebar.SidebarView"
+             x:DataType="vm:MainWindowViewModel"
+             mc:Ignorable="d"
+             d:DesignHeight="760" d:DesignWidth="280">
+    <!-- 侧栏内容视图：拖拽调宽、折叠等窗口级布局由 MainWindow 统一协调（见 MainWindow.axaml.cs）。
+         宽度上限经 SetSurfaceMaxWidth 与外层 Grid 列同步。 -->
+    <Border x:Name="Surface"
+            MinWidth="240" MaxWidth="480"
+            Background="{DynamicResource SidebarBackgroundBrush}" Padding="12,16,12,12">
+        <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+            <StackPanel Spacing="4">
+                <TextBlock Text="DeepSeek Harness" Classes="heading" />
+                <TextBlock Text="原生桌面工作台" Classes="caption" />
+            </StackPanel>
+
+            <!-- 顶部「新建会话」：DSH newSession 形态——左侧 16px 圆形加号图标，
+                 图标与文字间距 6，实底按钮样式见 Button.new-session。 -->
+            <Button Grid.Row="1"
+                    Margin="0,24,0,10"
+                    Classes="new-session"
+                    AutomationProperties.Name="新建会话"
+                    Command="{Binding NewSessionCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Path Width="16" Height="16"
+                          Data="M8,1.5 A6.5,6.5 0 1 0 8,14.5 A6.5,6.5 0 1 0 8,1.5 Z M5,8 L11,8 M8,5 L8,11"
+                          Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.5"
+                          StrokeLineCap="Round"
+                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <TextBlock Text="新建会话" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+
+            <!-- 视图模式：单列表 / 按工作区（对齐参考 Web 客户端的视图选项）。
+                 节头下间距 4 对齐 DSH session-list sectionHeader。 -->
+            <Grid Grid.Row="2" Margin="0,0,0,4" ColumnDefinitions="*,Auto">
+                <TextBlock Text="会话" Classes="caption" VerticalAlignment="Center" />
+                <ComboBox Grid.Column="1"
+                          MinWidth="100"
+                          SelectedIndex="{Binding SessionListModeIndex, Mode=TwoWay}">
+                    <ComboBoxItem Content="单列表" />
+                    <ComboBoxItem Content="按工作区" />
+                </ComboBox>
+            </Grid>
+
+            <!-- 横向滚动禁用 + 全链路显式 Stretch（ScrollViewer→ItemsControl→ItemsPanel→行按钮）：
+                 列表行宽度钉死在侧栏内容区宽度（占满减去固定边距），
+                 不随标题长度伸缩；超长标题由行内 TextTrimming 省略号截断，
+                 对齐 WebUI 的固定行宽列表。 -->
+            <ScrollViewer Grid.Row="3" Background="Transparent"
+                          Margin="0,0,-12,0"
+                          HorizontalAlignment="Stretch"
+                          HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding SessionRows}"
+                              HorizontalAlignment="Stretch"
+                              Margin="0,0,20,0">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel HorizontalAlignment="Stretch" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.DataTemplates>
+                        <DataTemplate x:DataType="vm:SessionGroupHeaderViewModel">
+                            <Button Classes="group-header"
+                                    Classes.current="{Binding IsCurrent}"
+                                    HorizontalAlignment="Stretch"
+                                    AutomationProperties.Name="{Binding TitleText}"
+                                    Command="{Binding $parent[sidebar:SidebarView].DataContext.ToggleGroupCommand}"
+                                    CommandParameter="{Binding}">
+                                <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="4"
+                                      HorizontalAlignment="Stretch">
+                                    <!-- 展开/折叠状态：收起向右、展开向下（DSH arrowOpen 旋转语义）。 -->
+                                    <Panel Grid.Column="0" Width="8" Height="16" VerticalAlignment="Center">
+                                        <Panel VerticalAlignment="Center" Width="8" Height="8">
+                                            <Path Data="M0,0 L4,4 L0,8"
+                                                  Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5"
+                                                  StrokeLineCap="Round"
+                                                  IsVisible="{Binding !IsExpanded}" />
+                                            <Path Data="M0,4 L4,8 L8,4"
+                                                  Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5"
+                                                  StrokeLineCap="Round"
+                                                  IsVisible="{Binding IsExpanded}" />
+                                        </Panel>
+                                    </Panel>
+                                    <!-- DSH WorkspaceBrowser 的 16px 工作区文件夹图标
+                                         （slot 16×20，label-tertiary 描边风格）。 -->
+                                    <Path Grid.Column="1" Width="16" Height="16" VerticalAlignment="Center"
+                                          Data="M2,11.5 L2,4.5 A1.5,1.5 0 0 1 3.5,3 L6.4,3 A1.5,1.5 0 0 1 7.6,3.6 L8.6,5 L13.5,5 A1.5,1.5 0 0 1 15,6.5 L15,11.5 A1.5,1.5 0 0 1 13.5,13 L3.5,13 A1.5,1.5 0 0 1 2,11.5 Z"
+                                          Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5"
+                                          StrokeLineCap="Round" />
+                                    <TextBlock Grid.Column="2" Text="{Binding TitleText}"
+                                               FontSize="14" FontWeight="SemiBold"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip.Tip="{Binding TitleText}" />
+                                    <TextBlock Grid.Column="3" Text="{Binding CountText}" Classes="caption"
+                                               Margin="4,0,0,0"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                        <DataTemplate x:DataType="vm:SessionItemViewModel">
+                            <Button Classes="session-row"
+                                    Classes.current="{Binding IsCurrent}"
+                                    HorizontalAlignment="Stretch"
+                                    AutomationProperties.Name="{Binding TitleText}"
+                                    Command="{Binding $parent[sidebar:SidebarView].DataContext.SelectSessionCommand}"
+                                    CommandParameter="{Binding}">
+                                <Grid ColumnDefinitions="*,Auto" RowSpacing="5"
+                                      HorizontalAlignment="Stretch">
+                                    <!-- 标题 14px 与工作区标题同规格（DSH Rows title）；层级由
+                                         40px 行缩进表达，不再用字号或字重区分。 -->
+                                    <TextBlock Grid.ColumnSpan="1"
+                                               Text="{Binding TitleText}"
+                                               FontSize="14"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip.Tip="{Binding TitleText}" />
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                        <Ellipse Width="7" Height="7" VerticalAlignment="Center"
+                                                 Fill="{DynamicResource StatusRunningBrush}"
+                                                 IsVisible="{Binding Running}" />
+                                        <TextBlock Text="{Binding RunningText}" Classes="caption"
+                                                   IsVisible="{Binding Running}" />
+                                        <TextBlock Text="{Binding UpdatedText}" Classes="caption" />
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.DataTemplates>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <Border Grid.Row="4"
+                    Margin="0,16,0,0"
+                    Padding="12"
+                    Background="{DynamicResource PanelBackgroundBrush}"
+                    CornerRadius="10">
+                <StackPanel Spacing="7">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                                 Fill="{DynamicResource StatusConnectedBrush}"
+                                 IsVisible="{Binding IsBackendConnected}" />
+                        <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                                 Fill="{DynamicResource TextMutedBrush}"
+                                 IsVisible="{Binding IsBackendDisconnected}" />
+                        <TextBlock Text="{Binding BackendStatusText}" FontSize="12" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding BackendErrorDetail}" Classes="caption" TextWrapping="Wrap"
+                               IsVisible="{Binding HasBackendError}" />
+                    <TextBlock Text="{Binding SimulationNotice}" Classes="caption" TextWrapping="Wrap"
+                               IsVisible="{Binding IsSimulationMode}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Border>
+</UserControl>

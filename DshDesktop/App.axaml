@@ -1,139 +1,24 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:md="clr-namespace:LiveMarkdown.Avalonia;assembly=LiveMarkdown.Avalonia"
              x:Class="DshDesktop.App"
              RequestedThemeVariant="Dark">
-    <!--
-      界面颜色全部来自下方按 ThemeVariant 划分的语义资源，窗口内不写死颜色值。
-      当前选择的主题固定为 Dark；需要更换时只改上面的 RequestedThemeVariant（Light，或 Default 跟随系统）。
-      深色取值为当前界面既定配色；浅色取值参考 Harness Web 端 ui-theme 的浅色语义色（design-platform.css）。
-    -->
+    <!-- App 只负责应用级引导：主题、LiveMarkdown 依赖样式与 Presentation/Styles 的引入。
+         界面颜色与具体控件样式分别见 Presentation/Styles/ThemeResources.axaml 与同目录各样式文件。
+         当前选择的主题固定为 Dark；需要更换时只改上面的 RequestedThemeVariant
+         （Light，或 Default 跟随系统）。 -->
 
     <Application.Styles>
         <FluentTheme />
-        <!-- Codex 风格滚动条：Thumb 在任何状态下保持胶囊形。
-             Fluent 模板的 Thumb 无 Margin、无内缩边框，纵向宽/横向高都直接绑定 ScrollBarSize（6px），
-             因此 CornerRadius 取厚度一半（3）即可让两端呈完整半圆，纵向横向一致；
-             主题状态样式只改 Thumb 背景，圆角在 pointerover/pressed 等状态下均由本样式稳定接管。 -->
-        <Style Selector="ScrollBar /template/ Thumb">
-            <Setter Property="CornerRadius" Value="3" />
-        </Style>
-        <!-- LiveMarkdown.Avalonia 控件样式（代码块、行内代码、链接等）；跟随 FluentTheme 之后加载。 -->
+        <StyleInclude Source="avares://DshDesktop/Presentation/Styles/ScrollBars.axaml" />
+        <!-- LiveMarkdown.Avalonia 控件样式（代码块、行内代码、链接等）；须在 FluentTheme
+             与应用自身的 Markdown 覆盖样式之间加载。 -->
         <StyleInclude Source="avares://LiveMarkdown.Avalonia/Styles.axaml" />
-        <!-- 覆盖库默认 CodeBlock 模板：参照 Codex 的代码框——一体化深底圆角、无外描边、
-             头部为 `</>` 图标 + 语言名 + 幽灵按钮。语法高亮配色仍由 DarkPlus 主题提供。
-             模板部件名（PART_CodeTextBlock 等）须与库的代码后台约定一致，缺失会抛异常。 -->
-        <Style Selector="md|CodeBlock">
-            <Setter Property="FontFamily" Value="Consolas, 'Courier New', monospace" />
-            <Setter Property="Foreground" Value="{DynamicResource CodeBlockForegroundBrush}" />
-            <Setter Property="Margin" Value="0,4" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="md:CodeBlock">
-                        <Border Background="{DynamicResource CodeBlockBackgroundBrush}"
-                                CornerRadius="8" ClipToBounds="True">
-                            <StackPanel Orientation="Vertical">
-                                <Grid ColumnDefinitions="*,Auto" Margin="12,7,6,0">
-                                    <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
-                                        <TextBlock Text="&lt;/&gt;"
-                                                   FontFamily="{TemplateBinding FontFamily}"
-                                                   FontSize="11" FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource CodeBlockMutedBrush}"
-                                                   VerticalAlignment="Center" />
-                                        <TextBlock x:Name="PART_LanguageTextBlock"
-                                                   Text="{TemplateBinding Language}"
-                                                   FontSize="12"
-                                                   Foreground="{DynamicResource CodeBlockMutedBrush}"
-                                                   VerticalAlignment="Center" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
-                                        <ToggleButton x:Name="PART_ToggleTextWrapButton"
-                                                      Width="26" Height="26"
-                                                      Padding="0" CornerRadius="5"
-                                                      BorderThickness="0"
-                                                      Focusable="False"
-                                                      IsChecked="{TemplateBinding IsCodeWrapped, Mode=TwoWay}">
-                                            <Viewbox Width="14" Height="14">
-                                                <Path Width="24" Height="24"
-                                                      Stroke="{DynamicResource CodeBlockMutedBrush}"
-                                                      StrokeThickness="2">
-                                                    <Path.Data>
-                                                        <GeometryGroup>
-                                                            <StreamGeometry>F1 M24,24z M0,0z M16,16L14,18 16,20</StreamGeometry>
-                                                            <StreamGeometry>F1 M24,24z M0,0z M3,12L18,12A3,3,0,1,1,18,18L14,18</StreamGeometry>
-                                                            <StreamGeometry>F1 M24,24z M0,0z M3,18L10,18</StreamGeometry>
-                                                            <StreamGeometry>F1 M24,24z M0,0z M3,6L21,6</StreamGeometry>
-                                                        </GeometryGroup>
-                                                    </Path.Data>
-                                                </Path>
-                                            </Viewbox>
-                                        </ToggleButton>
-                                        <Button x:Name="PART_CopyButton"
-                                                Width="26" Height="26"
-                                                Padding="0" CornerRadius="5"
-                                                BorderThickness="0"
-                                                Focusable="False">
-                                            <Viewbox Width="14" Height="14">
-                                                <Path Width="24" Height="24"
-                                                      Stroke="{DynamicResource CodeBlockMutedBrush}"
-                                                      StrokeThickness="2">
-                                                    <Path.Data>
-                                                        <GeometryGroup>
-                                                            <RectangleGeometry RadiusX="2" RadiusY="2" Rect="8,8,14,14" />
-                                                            <StreamGeometry>F1 M24,24z M0,0z M4,16C2.9,16,2,15.1,2,14L2,4C2,2.9,2.9,2,4,2L14,2C15.1,2,16,2.9,16,4</StreamGeometry>
-                                                        </GeometryGroup>
-                                                    </Path.Data>
-                                                </Path>
-                                            </Viewbox>
-                                        </Button>
-                                    </StackPanel>
-                                </Grid>
-                                <ScrollViewer x:Name="PART_ScrollViewer"
-                                              HorizontalScrollBarVisibility="{TemplateBinding HorizontalScrollBarVisibility}"
-                                              VerticalScrollBarVisibility="Auto">
-                                    <md:MarkdownTextBlock x:Name="PART_CodeTextBlock"
-                                                          Margin="12,6,12,12"
-                                                          FontFamily="{TemplateBinding FontFamily}"
-                                                          TextWrapping="{TemplateBinding TextWrapping}" />
-                                </ScrollViewer>
-                            </StackPanel>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        <Style Selector="md|CodeBlock /template/ ToggleButton#PART_ToggleTextWrapButton">
-            <Setter Property="ToolTip.Tip" Value="切换自动换行" />
-        </Style>
-        <Style Selector="md|CodeBlock /template/ Button#PART_CopyButton">
-            <Setter Property="ToolTip.Tip" Value="复制代码" />
-        </Style>
-        <!-- 幽灵按钮状态：Fluent 把状态底色画在按钮模板内的 PART_ContentPresenter 上，
-             覆盖该部件而非按钮的 Background。选中态（换行开关默认选中）只给轻微亮度差。 -->
-        <Style
-            Selector="md|CodeBlock /template/ ToggleButton#PART_ToggleTextWrapButton /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="Transparent" />
-        </Style>
-        <Style
-            Selector="md|CodeBlock /template/ ToggleButton#PART_ToggleTextWrapButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource CodeBlockButtonActiveBrush}" />
-        </Style>
-        <Style
-            Selector="md|CodeBlock /template/ ToggleButton#PART_ToggleTextWrapButton:checked /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource CodeBlockButtonActiveBrush}" />
-        </Style>
-        <Style
-            Selector="md|CodeBlock /template/ ToggleButton#PART_ToggleTextWrapButton:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource CodeBlockButtonActiveBrush}" />
-        </Style>
-        <Style
-            Selector="md|CodeBlock /template/ Button#PART_CopyButton /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="Transparent" />
-        </Style>
-        <Style
-            Selector="md|CodeBlock /template/ Button#PART_CopyButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource CodeBlockButtonActiveBrush}" />
-        </Style>
+        <StyleInclude Source="avares://DshDesktop/Presentation/Styles/Markdown.axaml" />
+        <StyleInclude Source="avares://DshDesktop/Presentation/Styles/Typography.axaml" />
+        <StyleInclude Source="avares://DshDesktop/Presentation/Styles/Conversation.axaml" />
+        <StyleInclude Source="avares://DshDesktop/Presentation/Styles/Tooling.axaml" />
+        <StyleInclude Source="avares://DshDesktop/Presentation/Styles/Sidebar.axaml" />
+        <StyleInclude Source="avares://DshDesktop/Presentation/Styles/Composer.axaml" />
     </Application.Styles>
 
     <Application.Resources>
@@ -141,117 +26,8 @@
             <ResourceDictionary.MergedDictionaries>
                 <!-- LiveMarkdown 默认颜色与字号；应用自身的语义资源键与其不冲突。 -->
                 <ResourceInclude Source="avares://LiveMarkdown.Avalonia/Defaults.axaml" />
+                <ResourceInclude Source="avares://DshDesktop/Presentation/Styles/ThemeResources.axaml" />
             </ResourceDictionary.MergedDictionaries>
-            <!-- 代码块共用色：两种主题下代码框都保持深底，与 DarkPlus 高亮配色（VS 暗色）成套。
-                 参照 Codex 的代码框观感：一体化深底、无外描边、弱化的头部与操作图标。 -->
-            <SolidColorBrush x:Key="CodeBlockBackgroundBrush" Color="#1E1E1E" />
-            <SolidColorBrush x:Key="CodeBlockForegroundBrush" Color="#D4D4D4" />
-            <SolidColorBrush x:Key="CodeBlockMutedBrush" Color="#9DA5B4" />
-            <!-- 换行开关默认处于选中态（IsCodeWrapped 默认 true），压掉 Fluent 的强调色底保持幽灵观感。 -->
-            <SolidColorBrush x:Key="CodeBlockButtonActiveBrush" Color="#2EFFFFFF" />
-            <ResourceDictionary.ThemeDictionaries>
-                <ResourceDictionary x:Key="Dark">
-                    <!-- Scrollbars: state changes affect color only; thickness and shape stay fixed. -->
-                    <x:Double x:Key="ScrollBarSize">6</x:Double>
-                    <TransformOperations x:Key="VerticalSmallScrollThumbScaleTransform">none</TransformOperations>
-                    <TransformOperations x:Key="HorizontalSmallScrollThumbScaleTransform">none</TransformOperations>
-                    <SolidColorBrush x:Key="ScrollBarPanningThumbBackground" Color="#3C3C3D" />
-                    <SolidColorBrush x:Key="ScrollBarThumbFillPointerOver" Color="#9E9E9F" />
-                    <SolidColorBrush x:Key="ScrollBarThumbFillPressed" Color="#9E9E9F" />
-                    <SolidColorBrush x:Key="ScrollBarThumbFillDisabled" Color="#3C3C3D" />
-                    <SolidColorBrush x:Key="ScrollBarThumbBackgroundColor" Color="#9E9E9F" />
-                    <SolidColorBrush x:Key="ScrollBarTrackFill" Color="Transparent" />
-                    <SolidColorBrush x:Key="ScrollBarTrackFillPointerOver" Color="Transparent" />
-                    <SolidColorBrush x:Key="ScrollBarTrackStroke" Color="Transparent" />
-                    <SolidColorBrush x:Key="ScrollBarTrackStrokePointerOver" Color="Transparent" />
-                    <SolidColorBrush x:Key="ScrollBarBackground" Color="Transparent" />
-                    <SolidColorBrush x:Key="ScrollBarBorderBrush" Color="Transparent" />
-                    <!-- 表面：侧栏底色为本轮指定的 #1B1B1C 中性灰。 -->
-                    <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#1B1B1C" />
-                    <SolidColorBrush x:Key="ChatBackgroundBrush" Color="#10131B" />
-                    <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#202532" />
-                    <SolidColorBrush x:Key="SubtleBorderBrush" Color="#252B3A" />
-                    <!-- WebUI composer surface: neutral elevated gray against the blue-black chat canvas. -->
-                    <SolidColorBrush x:Key="ComposerBackgroundBrush" Color="#2B2B2F" />
-                    <SolidColorBrush x:Key="ComposerControlBrush" Color="#3A3A40" />
-                    <SolidColorBrush x:Key="ComposerTextBrush" Color="#F1F1F3" />
-                    <SolidColorBrush x:Key="ComposerTextMutedBrush" Color="#A7ABB4" />
-                    <SolidColorBrush x:Key="ComposerActionBrush" Color="#679EFE" />
-                    <!-- 输入框聚焦时的面板描边：中性灰轻微提亮，避免强调色矩形观感。 -->
-                    <SolidColorBrush x:Key="ComposerFocusRingBrush" Color="#3F3F47" />
-                    <!-- 会话列表：选中态为本轮指定的 #2D2D2E；悬停取其与底色之间的
-                         中性灰 #262627——清晰但不过亮，也不会盖过选中态。 -->
-                    <SolidColorBrush x:Key="SessionHoverBrush" Color="#262627" />
-                    <SolidColorBrush x:Key="SessionSelectedBrush" Color="#2D2D2E" />
-                    <!-- 侧栏顶部「新建会话」按钮三态（对齐 DSH newSession 的实底形态）：
-                         常规 #43454A、悬停微亮、按下/激活 #353638。 -->
-                    <SolidColorBrush x:Key="NewSessionButtonBrush" Color="#43454A" />
-                    <SolidColorBrush x:Key="NewSessionButtonHoverBrush" Color="#4C4E53" />
-                    <SolidColorBrush x:Key="NewSessionButtonActiveBrush" Color="#353638" />
-                    <!-- 消息气泡 -->
-                    <SolidColorBrush x:Key="UserBubbleBrush" Color="#3B5CCC" />
-                    <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFFFF" />
-                    <SolidColorBrush x:Key="OnAccentMutedBrush" Color="#DCE5FF" />
-                    <!-- 悬浮输入面板发送按钮悬停：气泡强调色提亮一档。 -->
-                    <SolidColorBrush x:Key="ComposerSendHoverBrush" Color="#78A8FF" />
-                    <!-- 文本与状态 -->
-                    <SolidColorBrush x:Key="TextMutedBrush" Color="#8D96A6" />
-                    <SolidColorBrush x:Key="AccentTextBrush" Color="#AFC0FF" />
-                    <SolidColorBrush x:Key="StatusRunningBrush" Color="#F0B45A" />
-                    <SolidColorBrush x:Key="StatusConnectedBrush" Color="#5ED6A0" />
-                    <SolidColorBrush x:Key="StatusErrorBrush" Color="#FF9A9A" />
-                </ResourceDictionary>
-                <ResourceDictionary x:Key="Light">
-                    <!-- Scrollbars: state changes affect color only; thickness and shape stay fixed. -->
-                    <x:Double x:Key="ScrollBarSize">6</x:Double>
-                    <TransformOperations x:Key="VerticalSmallScrollThumbScaleTransform">none</TransformOperations>
-                    <TransformOperations x:Key="HorizontalSmallScrollThumbScaleTransform">none</TransformOperations>
-                    <SolidColorBrush x:Key="ScrollBarPanningThumbBackground" Color="#E4E4E5" />
-                    <SolidColorBrush x:Key="ScrollBarThumbFillPointerOver" Color="#585A5B" />
-                    <SolidColorBrush x:Key="ScrollBarThumbFillPressed" Color="#585A5B" />
-                    <SolidColorBrush x:Key="ScrollBarThumbFillDisabled" Color="#E4E4E5" />
-                    <SolidColorBrush x:Key="ScrollBarThumbBackgroundColor" Color="#585A5B" />
-                    <SolidColorBrush x:Key="ScrollBarTrackFill" Color="Transparent" />
-                    <SolidColorBrush x:Key="ScrollBarTrackFillPointerOver" Color="Transparent" />
-                    <SolidColorBrush x:Key="ScrollBarTrackStroke" Color="Transparent" />
-                    <SolidColorBrush x:Key="ScrollBarTrackStrokePointerOver" Color="Transparent" />
-                    <SolidColorBrush x:Key="ScrollBarBackground" Color="Transparent" />
-                    <SolidColorBrush x:Key="ScrollBarBorderBrush" Color="Transparent" />
-                    <!-- 表面：sidebar-fill / bg-base / module-platform / border-l2 -->
-                    <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#F9FAFB" />
-                    <SolidColorBrush x:Key="ChatBackgroundBrush" Color="#FFFFFF" />
-                    <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#F5F6F7" />
-                    <SolidColorBrush x:Key="SubtleBorderBrush" Color="#1A000000" />
-                    <!-- WebUI composer surface: light elevated neutral pair. -->
-                    <SolidColorBrush x:Key="ComposerBackgroundBrush" Color="#F4F5F7" />
-                    <SolidColorBrush x:Key="ComposerControlBrush" Color="#E7EAEE" />
-                    <SolidColorBrush x:Key="ComposerTextBrush" Color="#1A1D22" />
-                    <SolidColorBrush x:Key="ComposerTextMutedBrush" Color="#70757E" />
-                    <SolidColorBrush x:Key="ComposerActionBrush" Color="#3964FE" />
-                    <!-- 输入框聚焦时的面板描边：中性灰加深一档（当前固定 Dark 主题，仅保持完整性）。 -->
-                    <SolidColorBrush x:Key="ComposerFocusRingBrush" Color="#C7CBD3" />
-                    <!-- 会话列表：nav-item-hover / nav-item-active-accent -->
-                    <SolidColorBrush x:Key="SessionHoverBrush" Color="#F1F3F5" />
-                    <SolidColorBrush x:Key="SessionSelectedBrush" Color="#E4EDFD" />
-                    <!-- 消息气泡：button-info-fill(deepseek-500) -->
-                    <SolidColorBrush x:Key="UserBubbleBrush" Color="#4176E6" />
-                    <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFFFF" />
-                    <SolidColorBrush x:Key="OnAccentMutedBrush" Color="#E7EEFF" />
-                    <!-- 悬浮输入面板发送按钮悬停：气泡强调色加深一档。 -->
-                    <SolidColorBrush x:Key="ComposerSendHoverBrush" Color="#3563D9" />
-                    <!-- 侧栏顶部「新建会话」按钮三态的浅色对应：实底中性灰同构。
-                         （当前应用固定 Dark 主题，浅色值仅保持语义资源完整性。） -->
-                    <SolidColorBrush x:Key="NewSessionButtonBrush" Color="#E7EAEE" />
-                    <SolidColorBrush x:Key="NewSessionButtonHoverBrush" Color="#DDE0E4" />
-                    <SolidColorBrush x:Key="NewSessionButtonActiveBrush" Color="#D2D5DA" />
-                    <!-- 文本与状态：label-tertiary / link / warn-label / success / error-primary -->
-                    <SolidColorBrush x:Key="TextMutedBrush" Color="#81858C" />
-                    <SolidColorBrush x:Key="AccentTextBrush" Color="#4176E6" />
-                    <SolidColorBrush x:Key="StatusRunningBrush" Color="#DD8629" />
-                    <SolidColorBrush x:Key="StatusConnectedBrush" Color="#22C55E" />
-                    <SolidColorBrush x:Key="StatusErrorBrush" Color="#EC1313" />
-                </ResourceDictionary>
-            </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

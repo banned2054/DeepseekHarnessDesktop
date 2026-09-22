@@ -41,17 +41,18 @@
 
 依赖方向：Desktop 引用 Core、Harness、Infrastructure；Harness 和 Infrastructure 仅引用 Core，彼此不引用。
 
-每个项目按需使用 `Exceptions`、`Utils`、`Services`、`Models`、`ViewModels`、`Views`，类别下再按功能划分。不创建空目录，无 GUI 项目不使用 Views/ViewModels。Assets 等框架资源目录正常保留。
+每个项目按需使用 `Exceptions`、`Utils`、`Services`、`Models`、`ViewModels`、`Views`，类别下再按功能划分。不创建空目录，无 GUI 项目不使用 Views/ViewModels。Desktop 的界面层统一在 `Presentation/` 下组织：`Presentation/Views/`（含 MainWindow 与按区域细分的子目录）、`Presentation/Styles/`（样式与主题资源）。Assets 等框架资源目录正常保留。
 
 示例分类：
 
 ```text
 DshDesktop/
-  Views/{Shell,Sessions,Settings}/
-  ViewModels/{Shell,Sessions,Settings}/
-  Models/
+  Presentation/
+    Views/{Sidebar,Conversation,Tooling}/
+    Styles/
+  ViewModels/
   Services/
-  Assets/
+  Utils/
 
 DshDesktop.Core/
   Models/{Sessions,Messages,Workspaces}/
@@ -349,6 +350,16 @@ usage/token/缓存统计接入验证记录（Windows 10 x64，2026-09-21）：
 - `dotnet test DshDesktop.Tests/DshDesktop.Tests.csproj --no-restore`：60 通过、3 按设计跳过；新增 waterfall 帧/审批载荷、三种 outcome 严格 JSON 形态、未知 request 保持可拒绝的协议测试，以及当前会话审批过滤/允许一次命令回归。
 - `dotnet publish DshDesktop/DshDesktop.csproj -c Release -r win-x64 --self-contained true --no-restore -p:UsedAvaloniaProducts=`：通过，Windows x64 Native AOT 产物生成成功。普通 publish 因当前环境无法读取用户级 NuGet/Avalonia telemetry 目录，使用跳过 Avalonia telemetry 统计的等价本地验证参数完成。
 - 未验证：真实 Host 触发实际工具审批并在窗口点击后的端到端往返；用户问题 waterfall；macOS/Linux。
+
+UI 层目录重构验证记录（Windows 10 x64，2026-09-22）：
+
+- 背景（用户提出）：`MainWindow.axaml`（899 行）与 `App.axaml`（257 行）承载全部界面，样式、模板与视图混杂。按「UI 拆分、业务不动」范围重构为 Presentation 目录结构。
+- 实现：`App.axaml` 精简为 FluentTheme + LiveMarkdown 依赖样式 + `Presentation/Styles` 引入（ThemeResources/Typography/ScrollBars/Markdown/Sidebar/Conversation/Tooling/Composer 共 8 个样式文件，语义资源与选择器原样搬迁，加载顺序保持「FluentTheme → LiveMarkdown → Markdown 覆盖」）；视图拆为 `Presentation/Views`（MainWindow 精简为窗口级组合 + 侧栏列宽 clamp/抽屉折叠协调，SidebarView、ConversationView（含 SessionHeaderView/ComposerView）、Conversation/MessageView、Tooling/ToolActivityView、ApprovalPromptView）；`ToolCardTemplate`/`MessageBubbleTemplate` 大模板改为 DataTemplate 实例化对应 View。界面行为随视图迁移：消息贴底/前插锚定 → `ConversationView.axaml.cs`（改经 `OnDataContextChanged` 订阅），Enter 发送与输入框焦点类切换 → `ComposerView.axaml.cs`，折叠开关视觉 → `SessionHeaderView`（经事件上报 MainWindow 协调列宽）。ViewModel 仅一处微调：`PendingApprovalViewModel` 构造注入允许/拒绝命令（编译绑定无法跨文件回查窗口 DataContext，使 ApprovalPromptView 自包含）；`MainWindowViewModel` 业务流未动。发现并原样保留的遗留：`_anchoringPrepend` 无置真路径（历史滚动锚定方案残枝），后续如启用自动翻页需接回。
+- `dotnet build DshDesktop.slnx`：通过，0 警告 0 错误（compiled bindings 全部通过，含 `$parent[SidebarView].DataContext` 行级命令绑定）。
+- `dotnet test`：64 通过、3 按设计跳过（真实后端/模型 E2E），0 失败。
+- `dotnet publish DshDesktop/DshDesktop.csproj -c Release -r win-x64 --self-contained true`：清理 `obj/Release` 后完整 ILC 重跑，exit 0、0 警告 0 错误，产物 36.9 MB。
+- AOT 产物启动冒烟（模拟模式）：进程 8 秒存活后正常终止——全部 ResourceInclude/StyleInclude URI、DataTemplate 与布局在运行时解析无异常。
+- 未验证：窗口内交互复验（侧栏拖拽/折叠、Enter 发送、工具卡展开、审批按钮点击、流式贴底）——本环境无窗口级自动化，逻辑为原样搬迁且 VM 层测试通过，待用户日常使用确认；深色主题像素级对照；macOS/Linux。
 
 后续每个阶段记录：实现范围、目标平台、必要验证命令、实际结果、未验证事项。只有验收通过的任务才标记完成。
 

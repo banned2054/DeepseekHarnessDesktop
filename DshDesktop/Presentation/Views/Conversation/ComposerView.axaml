@@ -1,0 +1,108 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:DshDesktop.ViewModels"
+             xmlns:tooling="using:DshDesktop.Presentation.Views.Tooling"
+             x:Class="DshDesktop.Presentation.Views.Conversation.ComposerView"
+             x:DataType="vm:MainWindowViewModel"
+             mc:Ignorable="d"
+             d:DesignHeight="200" d:DesignWidth="720">
+    <!-- 输入/发送区：固定占住聊天窗口底部一行，不再叠放覆盖消息内容。
+         左侧工具栏与底部统计栏是视觉占位：附件与统计的协议链路未接入，
+         保持禁用或以 — 展示，不伪装成可用功能。 -->
+    <StackPanel Spacing="6">
+        <Border x:Name="ComposerSurface" Classes="composer-panel">
+            <StackPanel Spacing="8">
+                <!-- 审批横幅：选中会话的待决 approval/request 瀑布，裁决经 $events/result 回执。 -->
+                <ItemsControl ItemsSource="{Binding SessionPendingApprovals}"
+                              IsVisible="{Binding HasSessionPendingApprovals}">
+                    <ItemsControl.DataTemplates>
+                        <DataTemplate x:DataType="vm:PendingApprovalViewModel">
+                            <tooling:ApprovalPromptView />
+                        </DataTemplate>
+                    </ItemsControl.DataTemplates>
+                </ItemsControl>
+                <TextBlock Text="{Binding ErrorText}"
+                           IsVisible="{Binding HasError}"
+                           Foreground="{DynamicResource StatusErrorBrush}"
+                           TextWrapping="Wrap" />
+                <TextBox x:Name="MessageInput"
+                         Classes="composer-input"
+                         Text="{Binding DraftMessage, Mode=TwoWay}"
+                         PlaceholderText="输入消息…"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                <!-- 工具行：左侧保留命令入口，右侧模型选择与发送按钮同基线，
+                     对齐 WebUI 的 Input_Bottom chrome。 -->
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
+                    <Button Classes="composer-icon"
+                            IsEnabled="False"
+                            VerticalAlignment="Center"
+                            ToolTip.Tip="附件功能尚未接入">
+                        <Viewbox Width="15" Height="15">
+                            <Path Data="M12 5v14M5 12h14"
+                                  Stroke="{Binding $parent[Button].Foreground}"
+                                  StrokeThickness="2" />
+                        </Viewbox>
+                    </Button>
+                    <!-- 右侧区域：模型选择与发送/停止。目录与当前选型来自后端（follow 回声权威）。 -->
+                    <ComboBox Grid.Column="2"
+                              Classes="model-picker"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Center"
+                              ItemsSource="{Binding ModelOptions}"
+                              SelectedItem="{Binding SelectedModelOption, Mode=TwoWay}"
+                              IsEnabled="{Binding IsModelPickerEnabled}"
+                              ToolTip.Tip="切换当前会话的模型">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ModelOptionViewModel">
+                                <TextBlock Text="{Binding DisplayText}" FontSize="13"
+                                           TextTrimming="CharacterEllipsis" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Panel Grid.Column="3" Width="34" Height="34">
+                        <Button Classes="composer-stop"
+                                Command="{Binding CancelCommand}"
+                                IsVisible="{Binding IsSessionRunning}"
+                                ToolTip.Tip="停止生成">
+                            <Viewbox Width="15" Height="15">
+                                <Path
+                                    Data="M8 6H16A2 2 0 0 1 18 8V16A2 2 0 0 1 16 18H8A2 2 0 0 1 6 16V8A2 2 0 0 1 8 6Z"
+                                    Fill="{Binding $parent[Button].Foreground}" />
+                            </Viewbox>
+                        </Button>
+                        <Button Classes="composer-send"
+                                Command="{Binding SendMessageCommand}"
+                                IsVisible="{Binding !IsSessionRunning}"
+                                ToolTip.Tip="发送">
+                            <Viewbox Width="16" Height="16">
+                                <Path Data="M12 19V5M5 12l7-7 7 7"
+                                      Stroke="{Binding $parent[Button].Foreground}"
+                                      StrokeThickness="2" />
+                            </Viewbox>
+                        </Button>
+                    </Panel>
+                </Grid>
+            </StackPanel>
+        </Border>
+        <!-- whole-log 投影的统计条位于卡片外侧，保持 WebUI 的轻量底部信息带；
+             空会话（无步数且无计费 token）整体隐藏，与 WebUI StatsPills 口径一致。 -->
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <StackPanel Classes="composer-stats"
+                        Orientation="Horizontal"
+                        IsVisible="{Binding HasStatsData}"
+                        ToolTip.Tip="{Binding UsageDetailText}">
+                <TextBlock Text="{Binding UsageValueText}" Classes="composer-stat" />
+                <TextBlock Text="{Binding CacheHitValueText}" Classes="composer-stat" />
+                <TextBlock Text="{Binding SpeedValueText}" Classes="composer-stat"
+                           ToolTip.Tip="{Binding StatsDetailText}" />
+            </StackPanel>
+            <TextBlock Grid.Column="1"
+                       Text="Enter 发送 · Shift+Enter 换行"
+                       Classes="composer-stat" />
+        </Grid>
+    </StackPanel>
+</UserControl>

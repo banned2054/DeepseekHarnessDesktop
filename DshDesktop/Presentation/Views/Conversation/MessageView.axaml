@@ -1,0 +1,76 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:DshDesktop.ViewModels"
+             xmlns:md="clr-namespace:LiveMarkdown.Avalonia;assembly=LiveMarkdown.Avalonia"
+             x:Class="DshDesktop.Presentation.Views.Conversation.MessageView"
+             x:DataType="vm:MessageItemViewModel"
+             mc:Ignorable="d"
+             d:DesignHeight="120" d:DesignWidth="480">
+    <!-- 消息气泡：主时间线与过程组内的中间消息复用（DataTemplate 实例化本视图）。 -->
+    <Grid Margin="0,0,0,16">
+        <Border Classes="message-bubble user-bubble" IsVisible="{Binding IsUserMessage}">
+            <StackPanel Spacing="7">
+                <TextBlock Text="{Binding RoleLabel}" Classes="caption"
+                           Foreground="{DynamicResource OnAccentMutedBrush}" />
+                <TextBlock Text="{Binding Content}" TextWrapping="Wrap" LineHeight="22"
+                           Foreground="{DynamicResource OnAccentBrush}" />
+                <TextBlock Text="{Binding CreatedAtText}" Classes="caption"
+                           HorizontalAlignment="Right"
+                           Foreground="{DynamicResource OnAccentMutedBrush}" />
+            </StackPanel>
+        </Border>
+        <Border Classes="message-bubble assistant-bubble"
+                IsVisible="{Binding IsAssistantMessage}">
+            <StackPanel Spacing="7">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="{Binding RoleLabel}" Classes="caption"
+                               Foreground="{DynamicResource AccentTextBrush}" />
+                    <TextBlock Text="生成中…" Classes="caption"
+                               IsVisible="{Binding IsStreaming}" />
+                    <TextBlock Text="已中断" Classes="caption"
+                               Foreground="{DynamicResource StatusErrorBrush}"
+                               IsVisible="{Binding IsInterrupted}" />
+                </StackPanel>
+                <!-- 思考行（reasoning）：默认收起显示首行摘要，展开显示全文；
+                     纯思考消息（无正文）也复用本视图，正文区隐藏。 -->
+                <StackPanel Spacing="4" IsVisible="{Binding HasReasoning}">
+                    <Button Classes="tool-toggle" Command="{Binding ToggleReasoningCommand}"
+                            HorizontalAlignment="Left">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="思考" FontSize="12" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextMutedBrush}" />
+                            <TextBlock Text="{Binding ReasoningSummary}" Classes="caption"
+                                       TextTrimming="CharacterEllipsis" MaxWidth="420"
+                                       VerticalAlignment="Center"
+                                       IsVisible="{Binding !IsReasoningExpanded}" />
+                            <Panel Width="8" Height="8" VerticalAlignment="Center">
+                                <Path Data="M0,0 L4,4 L0,8"
+                                      Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5"
+                                      IsVisible="{Binding !IsReasoningExpanded}" />
+                                <Path Data="M0,4 L4,8 L8,4"
+                                      Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5"
+                                      IsVisible="{Binding IsReasoningExpanded}" />
+                            </Panel>
+                        </StackPanel>
+                    </Button>
+                    <Border Background="{DynamicResource PanelBackgroundBrush}"
+                            CornerRadius="6" Padding="10,8" MaxWidth="760" HorizontalAlignment="Left"
+                            IsVisible="{Binding IsReasoningExpanded}">
+                        <TextBlock Text="{Binding Reasoning}" Classes="reason-body" />
+                    </Border>
+                </StackPanel>
+                <!-- 助手内容按 Markdown 渲染，流式增量经 MarkdownBuilder 增量更新。 -->
+                <md:MarkdownRenderer MarkdownBuilder="{Binding MarkdownBuilder}"
+                                     IsVisible="{Binding Content, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <TextBlock Text="{Binding CreatedAtText}" Classes="caption"
+                           IsVisible="{Binding Content, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+        </Border>
+        <Border Classes="message-bubble system-bubble"
+                IsVisible="{Binding IsSystemMessage}">
+            <TextBlock Text="{Binding Content}" Classes="caption" TextWrapping="Wrap" />
+        </Border>
+    </Grid>
+</UserControl>

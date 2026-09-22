@@ -656,7 +656,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         if (SelectedSession is not null)
             foreach (var approval in _toolApprovalService.Pending)
                 if (approval.SessionId == SelectedSession.Id)
-                    SessionPendingApprovals.Add(new PendingApprovalViewModel(approval));
+                    SessionPendingApprovals.Add(new PendingApprovalViewModel(approval,
+                                                                            ApproveApprovalCommand,
+                                                                            RejectApprovalCommand));
 
         OnPropertyChanged(nameof(HasSessionPendingApprovals));
     }

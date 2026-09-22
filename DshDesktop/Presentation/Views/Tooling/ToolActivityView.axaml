@@ -1,0 +1,62 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:DshDesktop.ViewModels"
+             x:Class="DshDesktop.Presentation.Views.Tooling.ToolActivityView"
+             x:DataType="vm:ToolActivityItemViewModel"
+             mc:Ignorable="d"
+             d:DesignHeight="80" d:DesignWidth="480">
+    <!-- 工具卡片：顶层（运行中的轮次）与过程组展开时复用（DataTemplate 实例化本视图）。 -->
+    <Border Classes="tool-card">
+        <StackPanel Spacing="8">
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
+                <Panel Grid.Column="0" VerticalAlignment="Center" Width="8" Height="8">
+                    <Ellipse Width="8" Height="8"
+                             Fill="{DynamicResource StatusRunningBrush}"
+                             IsVisible="{Binding IsRunning}" />
+                    <Ellipse Width="8" Height="8"
+                             Fill="{DynamicResource StatusErrorBrush}"
+                             IsVisible="{Binding IsFailed}" />
+                    <Ellipse Width="8" Height="8"
+                             Fill="{DynamicResource StatusConnectedBrush}"
+                             IsVisible="{Binding IsSucceeded}" />
+                </Panel>
+                <TextBlock Grid.Column="1" Text="{Binding DisplayName}" FontSize="13"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource AccentTextBrush}"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Column="2" Text="{Binding StatusText}" Classes="caption"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Column="3" Text="{Binding CreatedAtText}"
+                           Classes="caption" VerticalAlignment="Center" />
+                <Button Grid.Column="4" Classes="tool-toggle"
+                        Content="{Binding DetailsToggleText}"
+                        Command="{Binding ToggleDetailsCommand}"
+                        IsVisible="{Binding HasDetails}"
+                        VerticalAlignment="Center" />
+            </Grid>
+            <StackPanel Spacing="8" IsVisible="{Binding IsExpanded}">
+                <Border Background="{DynamicResource ChatBackgroundBrush}"
+                        CornerRadius="6" Padding="10,8" IsVisible="{Binding HasError}">
+                    <TextBlock Text="{Binding ErrorReason}" FontSize="12"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource StatusErrorBrush}" />
+                </Border>
+                <StackPanel Spacing="4"
+                            IsVisible="{Binding ArgumentsText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Text="参数" Classes="caption" />
+                    <TextBlock Classes="tool-mono" Text="{Binding ArgumentsPreview}" />
+                </StackPanel>
+                <StackPanel Spacing="4"
+                            IsVisible="{Binding ResultText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Text="结果" Classes="caption" />
+                    <Border Background="{DynamicResource ChatBackgroundBrush}"
+                            CornerRadius="6" Padding="10,8" MaxHeight="320">
+                        <TextBlock Classes="tool-mono" Text="{Binding ResultPreview}" />
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

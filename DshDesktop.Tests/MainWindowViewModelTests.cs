@@ -2,6 +2,7 @@ using Avalonia;
 using DshDesktop.Core.Models;
 using DshDesktop.Core.Services;
 using DshDesktop.Infrastructure.Services;
+using DshDesktop.Presentation.Views;
 using DshDesktop.ViewModels;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
