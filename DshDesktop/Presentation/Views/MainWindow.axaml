@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:views="using:DshDesktop.Presentation.Views"
         xmlns:sidebar="using:DshDesktop.Presentation.Views.Sidebar"
         xmlns:conversation="using:DshDesktop.Presentation.Views.Conversation"
         x:Class="DshDesktop.Presentation.Views.MainWindow"
@@ -12,30 +13,41 @@
         MinHeight="600"
         Width="1280"
         Height="760"
-        Title="Deepseek Harness">
-    <!-- 窗口只负责窗口级布局：组合侧栏、分隔条与会话主区域。
+        Title="Deepseek Harness"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="32"
+        WindowDecorations="Full"
+        WindowDecorationsTheme="{DynamicResource DshWindowDecorationsTheme}">
+    <!-- 自定义 chrome：客户区延伸进系统标题栏，WindowTitleBarView 承担标题与拖动，
+         装饰主题（Styles/TitleBar.axaml）只绘制系统 caption 按钮，Window.Title 保留给
+         任务栏与可访问性。窗口只负责窗口级布局：标题栏 + 侧栏/分隔条/会话主区域。
          侧栏可拖拽：GridSplitter 只调整左列固定像素宽，右列保持 1* 吃掉差值，
          拖拽等量挤压右栏而窗口总宽不变。左列宽度由 code-behind clamp 到
          [240, min(480, 可用宽 - 560)]（splitter 列不占布局宽度），窗口尺寸变化后
-         同样重新 clamp；折叠时左列清零、左栏与 splitter 隐藏，右侧填满。 -->
-    <Grid x:Name="RootGrid">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="280" MinWidth="240" MaxWidth="480" />
-            <ColumnDefinition Width="0" />
-            <ColumnDefinition Width="1*" MinWidth="560" />
-        </Grid.ColumnDefinitions>
-        <sidebar:SidebarView x:Name="Sidebar" Grid.Column="0" />
+         同样重新 clamp；折叠时左列清零、左栏与 splitter 隐藏，右侧填满。
+         标题栏跨整个窗口宽度，不随侧栏折叠移动。 -->
+    <Grid x:Name="RootGrid" RowDefinitions="Auto,*">
+        <views:WindowTitleBarView x:Name="TitleBar" Grid.Row="0" />
 
-        <conversation:ConversationView x:Name="Conversation" Grid.Column="2" />
+        <Grid x:Name="ContentGrid" Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="280" MinWidth="240" MaxWidth="480" />
+                <ColumnDefinition Width="0" />
+                <ColumnDefinition Width="1*" MinWidth="560" />
+            </Grid.ColumnDefinitions>
+            <sidebar:SidebarView x:Name="Sidebar" Grid.Column="0" />
 
-        <!-- 分隔条：布局列宽 0，左右栏视觉上直接相接；命中区是悬跨分界线的 8px 控件
-             （左右各 4px，声明在最后以获得最高 z-order）。PreviousAndNext 在
-             「固定列 + 星号列」组合下只改左列固定宽，拖拽等量挤压右栏而窗口总宽不变。 -->
-        <GridSplitter x:Name="SidebarSplitter" Grid.Column="1"
-                      Classes="sidebar-splitter"
-                      ResizeDirection="Columns"
-                      ResizeBehavior="PreviousAndNext"
-                      Width="8"
-                      HorizontalAlignment="Center" VerticalAlignment="Stretch" />
+            <conversation:ConversationView x:Name="Conversation" Grid.Column="2" />
+
+            <!-- 分隔条：布局列宽 0，左右栏视觉上直接相接；命中区是悬跨分界线的 8px 控件
+                 （左右各 4px，声明在最后以获得最高 z-order）。PreviousAndNext 在
+                 「固定列 + 星号列」组合下只改左列固定宽，拖拽等量挤压右栏而窗口总宽不变。 -->
+            <GridSplitter x:Name="SidebarSplitter" Grid.Column="1"
+                          Classes="sidebar-splitter"
+                          ResizeDirection="Columns"
+                          ResizeBehavior="PreviousAndNext"
+                          Width="8"
+                          HorizontalAlignment="Center" VerticalAlignment="Stretch" />
+        </Grid>
     </Grid>
 </Window>

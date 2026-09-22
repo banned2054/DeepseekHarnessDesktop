@@ -38,6 +38,11 @@
             <SolidColorBrush x:Key="ChatBackgroundBrush" Color="#10131B" />
             <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#202532" />
             <SolidColorBrush x:Key="SubtleBorderBrush" Color="#252B3A" />
+            <!-- 自定义标题栏：全窗口统一的一条 chrome surface，略深于侧栏以区分层级。 -->
+            <SolidColorBrush x:Key="TitleBarBackgroundBrush" Color="#18181A" />
+            <!-- Caption 关闭按钮的 Windows 式红（悬停/按下两档），仅标题栏 chrome 使用。 -->
+            <SolidColorBrush x:Key="TitleBarCloseHoverBrush" Color="#C42B1C" />
+            <SolidColorBrush x:Key="TitleBarClosePressedBrush" Color="#9E1B14" />
             <!-- WebUI composer surface: neutral elevated gray against the blue-black chat canvas. -->
             <SolidColorBrush x:Key="ComposerBackgroundBrush" Color="#2B2B2F" />
             <SolidColorBrush x:Key="ComposerControlBrush" Color="#3A3A40" />
@@ -89,6 +94,10 @@
             <SolidColorBrush x:Key="ChatBackgroundBrush" Color="#FFFFFF" />
             <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#F5F6F7" />
             <SolidColorBrush x:Key="SubtleBorderBrush" Color="#1A000000" />
+            <!-- 自定义标题栏（浅色对应）与 caption 关闭按钮红。 -->
+            <SolidColorBrush x:Key="TitleBarBackgroundBrush" Color="#F3F4F6" />
+            <SolidColorBrush x:Key="TitleBarCloseHoverBrush" Color="#E81123" />
+            <SolidColorBrush x:Key="TitleBarClosePressedBrush" Color="#F1707A" />
             <!-- WebUI composer surface: light elevated neutral pair. -->
             <SolidColorBrush x:Key="ComposerBackgroundBrush" Color="#F4F5F7" />
             <SolidColorBrush x:Key="ComposerControlBrush" Color="#E7EAEE" />

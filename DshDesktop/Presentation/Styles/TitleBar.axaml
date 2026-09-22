@@ -1,0 +1,150 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:chrome="using:Avalonia.Controls.Chrome">
+    <!-- 窗口标题栏：Avalonia 12 自定义 chrome。MainWindow 以 ExtendClientAreaToDecorationsHint
+         把客户区延伸进系统标题栏，WindowDecorationsTheme 指向这里的装饰主题——只保留
+         min/max/close 三个 caption 按钮（由框架按 PART 名称接线、经 ElementRole 走系统
+         命中测试），不绘制标题文本与标题栏底条，标题与拖动区由 WindowTitleBarView 的
+         客户区内容承担（ElementRole=TitleBar），避免与自定义标题重复。 -->
+
+    <Styles.Resources>
+        <!-- caption 按钮宽 44、三枚共 132：WindowTitleBarView 右端按此留白，
+             按钮本体由装饰主题的 overlay 绘制在客户区内容之上。 -->
+        <x:Double x:Key="TitleBarCaptionButtonWidth">44</x:Double>
+        <x:Double x:Key="TitleBarCaptionAreaWidth">132</x:Double>
+
+        <!-- caption 按钮：透明底幽灵态，悬停/按下提亮；关闭按钮单独 Windows 式红底白图标。
+             视觉在这里定义，行为（点击调最小化/最大化/关闭、禁用态、命中测试）全部来自
+             WindowDrawnDecorations 按 PART 名称的接线与 ElementRole。 -->
+        <ControlTheme x:Key="DshCaptionButtonTheme" TargetType="Button">
+            <Setter Property="Width" Value="{DynamicResource TitleBarCaptionButtonWidth}" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      Background="Transparent"
+                                      Content="{TemplateBinding Content}" />
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover /template/ ContentPresenter">
+                <Setter Property="Background" Value="{DynamicResource SessionHoverBrush}" />
+            </Style>
+            <Style Selector="^:pressed /template/ ContentPresenter">
+                <Setter Property="Background" Value="{DynamicResource SessionSelectedBrush}" />
+            </Style>
+            <Style Selector="^.close:pointerover /template/ ContentPresenter">
+                <Setter Property="Background" Value="{DynamicResource TitleBarCloseHoverBrush}" />
+            </Style>
+            <Style Selector="^.close:pressed /template/ ContentPresenter">
+                <Setter Property="Background" Value="{DynamicResource TitleBarClosePressedBrush}" />
+            </Style>
+            <Style Selector="^.close:pointerover /template/ ContentPresenter Path">
+                <Setter Property="Fill" Value="{DynamicResource OnAccentBrush}" />
+            </Style>
+            <Style Selector="^.close:pressed /template/ ContentPresenter Path">
+                <Setter Property="Fill" Value="{DynamicResource OnAccentBrush}" />
+            </Style>
+            <Style Selector="^:disabled">
+                <Setter Property="Opacity" Value="0.2" />
+            </Style>
+        </ControlTheme>
+
+        <!-- 窗口装饰主题：替换 Fluent 默认模板——默认模板会把窗口标题文本画进 overlay，
+             与自定义标题栏重复。这里 overlay 只放 caption 按钮；underlay（默认的标题栏
+             底条/边框）与全屏 popover 一并不需要。PART 名称与伪类样式对齐 Fluent 默认
+             模板，框架按名称接线按钮行为。 -->
+        <ControlTheme x:Key="DshWindowDecorationsTheme" TargetType="{x:Type chrome:WindowDrawnDecorations}">
+            <Setter Property="DefaultTitleBarHeight" Value="32" />
+            <Setter Property="DefaultFrameThickness" Value="1" />
+            <Setter Property="DefaultShadowThickness" Value="8" />
+            <Setter Property="Template">
+                <WindowDrawnDecorationsTemplate>
+                    <WindowDrawnDecorationsContent>
+                        <WindowDrawnDecorationsContent.Overlay>
+                            <StackPanel x:Name="PART_OverlayPanel"
+                                        VerticalAlignment="Top" HorizontalAlignment="Right"
+                                        Height="{TemplateBinding TitleBarHeight}"
+                                        Orientation="Horizontal">
+                                <Button x:Name="PART_MinimizeButton"
+                                        Theme="{StaticResource DshCaptionButtonTheme}"
+                                        chrome:WindowDecorationProperties.ElementRole="MinimizeButton">
+                                    <Viewbox Width="11" Margin="2">
+                                        <Path Stretch="UniformToFill"
+                                              Fill="{DynamicResource TextMutedBrush}"
+                                              Data="M2048 1229v-205h-2048v205h2048z" />
+                                    </Viewbox>
+                                </Button>
+                                <Button x:Name="PART_MaximizeButton"
+                                        Theme="{StaticResource DshCaptionButtonTheme}"
+                                        chrome:WindowDecorationProperties.ElementRole="MaximizeButton">
+                                    <Viewbox Width="11" Margin="2">
+                                        <Viewbox.RenderTransform>
+                                            <RotateTransform Angle="-90" />
+                                        </Viewbox.RenderTransform>
+                                        <Path x:Name="RestoreButtonPath" Stretch="UniformToFill"
+                                              Fill="{DynamicResource TextMutedBrush}"
+                                              Data="M2048 2048v-2048h-2048v2048h2048zM1843 1843h-1638v-1638h1638v1638z" />
+                                    </Viewbox>
+                                </Button>
+                                <Button x:Name="PART_CloseButton" Classes="close"
+                                        Theme="{StaticResource DshCaptionButtonTheme}"
+                                        chrome:WindowDecorationProperties.ElementRole="CloseButton">
+                                    <Viewbox Width="11" Margin="2">
+                                        <Path Stretch="UniformToFill"
+                                              Fill="{DynamicResource TextMutedBrush}"
+                                              Data="M1169 1024l879 -879l-145 -145l-879 879l-879 -879l-145 145l879 879l-879 879l145 145l879 -879l879 879l145 -145z" />
+                                    </Viewbox>
+                                </Button>
+                            </StackPanel>
+                        </WindowDrawnDecorationsContent.Overlay>
+                    </WindowDrawnDecorationsContent>
+                </WindowDrawnDecorationsTemplate>
+            </Setter>
+            <!-- 最大化后图标切换为还原图形。 -->
+            <Style Selector="^:maximized /template/ Path#RestoreButtonPath">
+                <Setter Property="Data"
+                        Value="M2048 410h-410v-410h-1638v1638h410v410h1638v-1638zM1434 1434h-1229v-1229h1229v1229zM1843 1843h-1229v-205h1024v-1024h205v1229z" />
+            </Style>
+            <!-- 平台不支持的动作隐藏对应按钮；全屏时不显示 caption。 -->
+            <Style Selector="^:not(:has-minimize) /template/ Button#PART_MinimizeButton">
+                <Setter Property="IsVisible" Value="False" />
+            </Style>
+            <Style Selector="^:not(:has-maximize) /template/ Button#PART_MaximizeButton">
+                <Setter Property="IsVisible" Value="False" />
+            </Style>
+            <Style Selector="^:fullscreen /template/ StackPanel#PART_OverlayPanel">
+                <Setter Property="IsVisible" Value="False" />
+            </Style>
+        </ControlTheme>
+    </Styles.Resources>
+
+    <!-- 窗口标题栏内容样式：单行 32px 紧凑条。会话标题/id 等业务信息属于
+         Conversation 的 SessionHeaderView（Typography 样式），不在此定义。 -->
+    <!-- 侧栏折叠开关：小型 ghost 图标按钮，无按钮边框。 -->
+    <Style Selector="Button.titlebar-icon">
+        <Setter Property="Width" Value="26" />
+        <Setter Property="Height" Value="26" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.titlebar-icon:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource SessionHoverBrush}" />
+    </Style>
+    <Style Selector="Button.titlebar-icon:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource SessionSelectedBrush}" />
+    </Style>
+    <Style Selector="Button.titlebar-icon:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+</Styles>

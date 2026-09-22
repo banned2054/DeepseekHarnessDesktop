@@ -21,16 +21,6 @@ public partial class ConversationView : UserControl
         MessagesScroll.ScrollChanged += OnMessagesScrollChanged;
     }
 
-    /// <summary>用户点击侧栏折叠/展开开关（转发自顶栏）；窗口级协调见 MainWindow。</summary>
-    public event EventHandler? SidebarToggleRequested
-    {
-        add => Header.SidebarToggleRequested += value;
-        remove => Header.SidebarToggleRequested -= value;
-    }
-
-    /// <summary>顶栏开关的折叠态视觉（图标/Tooltip/可访问名称）。</summary>
-    public void SetSidebarToggleCollapsed(bool collapsed) => Header.SetSidebarCollapsed(collapsed);
-
     // DataContext 由窗口在 XAML 组合时继承注入；订阅跟随其生命周期增减。
     protected override void OnDataContextChanged(EventArgs e)
     {
@@ -67,7 +57,7 @@ public partial class ConversationView : UserControl
         // 否则视口按原偏移落在新内容上（跳到已加载历史的顶端）。会话切换等其它
         // Reset 不置锚——其偏移归零属预期，补偿反而会把视口抬到错误位置。
         if (e.Action == NotifyCollectionChangedAction.Reset
-            && DataContext is MainWindowViewModel { IsLoadingOlder: true })
+         && DataContext is MainWindowViewModel { IsLoadingOlder: true })
         {
             _anchoringPrepend = true;
         }
@@ -97,7 +87,7 @@ public partial class ConversationView : UserControl
             // 顶部插入内容把既有内容向下推；同步抬高偏移，用户看到的位置保持不变。
             // 补偿分支同样推进 extent 基线，避免后续流式增高拿过期 extent 误判贴底。
             _messagesExtent = scroll.Extent.Height;
-            scroll.Offset = scroll.Offset.WithY(scroll.Offset.Y + e.ExtentDelta.Y);
+            scroll.Offset   = scroll.Offset.WithY(scroll.Offset.Y + e.ExtentDelta.Y);
             return;
         }
 

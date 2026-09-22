@@ -7,43 +7,22 @@
              x:DataType="vm:MainWindowViewModel"
              mc:Ignorable="d"
              d:DesignHeight="90" d:DesignWidth="720">
-    <!-- 会话区顶栏：标题行与侧栏折叠开关；折叠开关本身只上报事件，
-         列宽协调由 MainWindow 完成（跨 SidebarView / ConversationView 的窗口级布局）。 -->
-    <Border Padding="28,22" BorderBrush="{DynamicResource SubtleBorderBrush}"
+    <!-- 会话区头部：当前会话的上下文信息（标题、id、运行状态、运行环境），
+         属于 Conversation 而非窗口 chrome——侧栏开关在 MainWindow 级的
+         WindowTitleBarView，与本视图无关。 -->
+    <Border Padding="28,10" BorderBrush="{DynamicResource SubtleBorderBrush}"
             BorderThickness="0,0,0,1">
-        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
-            <!-- 侧栏折叠/展开开关：同一按钮互斥切换，折叠后是主界面左上唯一的侧栏入口。 -->
-            <Button x:Name="SidebarToggle"
-                    Classes="composer-icon"
-                    VerticalAlignment="Center"
-                    Click="OnSidebarToggleClick"
-                    ToolTip.Tip="收起侧栏"
-                    AutomationProperties.Name="收起侧栏">
-                <Panel Width="16" Height="16">
-                    <!-- 左栏可见时显示向左双箭头（收起）；折叠后切换为向右双箭头（展开）。 -->
-                    <Path x:Name="CollapseSidebarIcon"
-                          Data="M9,3 L4.5,8 L9,13 M14,3 L9.5,8 L14,13"
-                          Stroke="{Binding $parent[Button].Foreground}"
-                          StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
-                          HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    <Path x:Name="ExpandSidebarIcon"
-                          Data="M7,3 L11.5,8 L7,13 M2,3 L6.5,8 L2,13"
-                          Stroke="{Binding $parent[Button].Foreground}"
-                          StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
-                          HorizontalAlignment="Center" VerticalAlignment="Center"
-                          IsVisible="False" />
-                </Panel>
-            </Button>
-            <StackPanel Grid.Column="1" Spacing="4">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
+            <StackPanel Spacing="3">
                 <TextBlock Text="{Binding SelectedSession.TitleText, FallbackValue=选择一个会话}"
-                           Classes="heading" />
+                           Classes="heading" FontSize="18" TextTrimming="CharacterEllipsis" />
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <TextBlock Text="{Binding SelectedSession.Id}" Classes="caption" />
                     <TextBlock Text="生成中…" Classes="caption" Foreground="{DynamicResource StatusRunningBrush}"
                                IsVisible="{Binding IsSessionRunning}" />
                 </StackPanel>
             </StackPanel>
-            <Border Grid.Column="2" Background="{DynamicResource PanelBackgroundBrush}" CornerRadius="14"
+            <Border Grid.Column="1" Background="{DynamicResource PanelBackgroundBrush}" CornerRadius="14"
                     Padding="12,7"
                     VerticalAlignment="Center">
                 <TextBlock Text="本地桌面" Classes="caption" />

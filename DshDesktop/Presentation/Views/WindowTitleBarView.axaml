@@ -1,0 +1,49 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:chrome="using:Avalonia.Controls.Chrome"
+             x:Class="DshDesktop.Presentation.Views.WindowTitleBarView"
+             mc:Ignorable="d"
+             d:DesignHeight="32" d:DesignWidth="1000">
+    <!-- 全窗口标题栏：跨整个窗口宽度，不属于 Sidebar 或 Conversation。客户区经
+         ExtendClientAreaToDecorationsHint 延伸进系统标题栏后，本视图即窗口 chrome 内容：
+         整条标记 ElementRole=TitleBar 承担拖动/双击最大化，交互控件单独标记 User
+         保证可点击；右端为装饰主题 overlay 绘制的系统 caption 按钮留白。
+         只承载窗口级内容（侧栏开关、将来的全局 toolbar/menu），不放当前会话的
+         业务信息——那些属于 Conversation 的 SessionHeaderView。 -->
+    <Border Background="{DynamicResource TitleBarBackgroundBrush}"
+            chrome:WindowDecorationProperties.ElementRole="TitleBar">
+        <Grid ColumnDefinitions="Auto,*,Auto" Height="32" Margin="8,0,0,0">
+            <!-- 侧栏折叠/展开开关：位置固定在窗口左上角，不随侧栏折叠移动；
+                 折叠本身只上报事件，列宽协调由 MainWindow 完成。 -->
+            <Button x:Name="SidebarToggle"
+                    Classes="titlebar-icon"
+                    VerticalAlignment="Center"
+                    chrome:WindowDecorationProperties.ElementRole="User"
+                    Click="OnSidebarToggleClick"
+                    ToolTip.Tip="收起侧栏"
+                    AutomationProperties.Name="收起侧栏">
+                <Panel Width="16" Height="16">
+                    <!-- 左栏可见时显示向左双箭头（收起）；折叠后切换为向右双箭头（展开）。 -->
+                    <Path x:Name="CollapseSidebarIcon"
+                          Data="M9,3 L4.5,8 L9,13 M14,3 L9.5,8 L14,13"
+                          Stroke="{Binding $parent[Button].Foreground}"
+                          StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
+                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Path x:Name="ExpandSidebarIcon"
+                          Data="M7,3 L11.5,8 L7,13 M2,3 L6.5,8 L2,13"
+                          Stroke="{Binding $parent[Button].Foreground}"
+                          StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
+                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                          IsVisible="False" />
+                </Panel>
+            </Button>
+            <!-- 将来的全局 toolbar / menu（File/Edit/View/Help 等）落位于此；
+                 目前留空作为拖动区域（整条 TitleBar 角色已覆盖拖动）。 -->
+            <Panel Grid.Column="1" />
+            <!-- caption 按钮留白：宽度与装饰主题的三枚按钮一致，overlay 绘制于其上方。 -->
+            <Panel Grid.Column="2" Width="{DynamicResource TitleBarCaptionAreaWidth}" />
+        </Grid>
+    </Border>
+</UserControl>

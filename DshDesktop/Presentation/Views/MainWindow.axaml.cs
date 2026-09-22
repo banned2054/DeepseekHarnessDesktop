@@ -19,7 +19,7 @@ public partial class MainWindow : Window
     private double _lastSidebarWidth = SidebarDefaultWidth;
 
     // Avalonia 不为 ColumnDefinition 的 x:Name 生成字段，按位置取列。
-    private ColumnDefinition SidebarColumn => RootGrid.ColumnDefinitions[0];
+    private ColumnDefinition SidebarColumn => ContentGrid.ColumnDefinitions[0];
 
     public MainWindow() : this(new MainWindowViewModel(new SimulatedSessionService(),
                                                        new SimulatedBackendStatusService(),
@@ -33,8 +33,8 @@ public partial class MainWindow : Window
     {
         DataContext = viewModel;
         InitializeComponent();
-        Conversation.SidebarToggleRequested += OnSidebarToggleRequested;
-        RootGrid.SizeChanged                += OnRootGridSizeChanged;
+        TitleBar.SidebarToggleRequested += OnSidebarToggleRequested;
+        RootGrid.SizeChanged            += OnRootGridSizeChanged;
     }
 
     /// <summary>窗口尺寸变化后重新 clamp 左栏宽度；折叠状态下保持整列隐藏，不介入。</summary>
@@ -66,7 +66,7 @@ public partial class MainWindow : Window
         SidebarColumn.Width       = new GridLength(0);
         Sidebar.IsVisible         = false;
         SidebarSplitter.IsVisible = false;
-        Conversation.SetSidebarToggleCollapsed(true);
+        TitleBar.SetSidebarCollapsed(true);
     }
 
     /// <summary>展开：恢复 MinWidth 下限与上次宽度并按当前窗口 clamp；splitter 命中区随之恢复。</summary>
@@ -78,7 +78,7 @@ public partial class MainWindow : Window
         Sidebar.IsVisible         = true;
         SidebarSplitter.IsVisible = true;
         ClampSidebarWidth();
-        Conversation.SetSidebarToggleCollapsed(false);
+        TitleBar.SetSidebarCollapsed(false);
     }
 
     /// <summary>
@@ -92,9 +92,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        var available = RootGrid.Bounds.Width;
-        var upper = Math.Max(SidebarMinWidth,
-                             Math.Min(SidebarMaxWidth, available - ContentMinWidth));
+        var available = ContentGrid.Bounds.Width;
+        var upper     = Math.Max(SidebarMinWidth, Math.Min(SidebarMaxWidth, available - ContentMinWidth));
         SidebarColumn.MaxWidth = upper;
         Sidebar.SetSurfaceMaxWidth(upper);
         var current = SidebarColumn.Width.IsAbsolute ? SidebarColumn.Width.Value : SidebarDefaultWidth;
