@@ -27,8 +27,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     // 时间线组装状态：快照、增量与翻页共用同一套分组规则。
     private TimelineAssembly _assembly;
     private ModelSelection?  _currentModel;
-    private string           _draftMessage = string.Empty;
-    private string           _errorText    = string.Empty;
+    private string           _errorText = string.Empty;
 
     private CancellationTokenSource? _followCancellation;
 
@@ -41,11 +40,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
     // 历史窗口状态：快照游标（throughSeq）、窗口首条事件 seq（beforeSeq）与是否还有更早历史。
     private long _historyThroughSeq;
-    private bool _isCancelling;
     private bool _isInitialized;
     private bool _isLoadingOlder;
     private bool _isSelectingModel;
-    private bool _isSending;
     private int  _listRefreshPending;
 
     // 模型选择：目录为全局只读快照，当前选型随会话 follow 流回声更新（后端权威）。
@@ -98,9 +95,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _toolApprovalService = toolApprovalService;
         IsSimulationMode     = isSimulatedMode;
         _postToUi            = postToUi ?? (action => action());
+        // 草稿/发送/取消已迁入 Composer；失败仍走窗口级 ErrorText（null 表示清除）。
+        Composer             = new ComposerViewModel(sessionService, text => ErrorText = text ?? string.Empty);
         NewSessionCommand    = new AsyncRelayCommand(CreateNewSessionAsync);
-        SendMessageCommand   = new AsyncRelayCommand(SendMessageAsync, CanSendMessage);
-        CancelCommand        = new AsyncRelayCommand(CancelGenerationAsync, CanCancelGeneration);
         LoadOlderCommand     = new AsyncRelayCommand(LoadOlderAsync, CanLoadOlder);
         SelectSessionCommand = new RelayCommand<SessionItemViewModel>(session => SelectedSession = session);
         ToggleGroupCommand   = new RelayCommand<SessionGroupHeaderViewModel>(ToggleGroup);
@@ -113,6 +110,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         _backendHostService.StatusChanged     += OnBackendStatusChanged;
         _toolApprovalService.ApprovalsChanged += OnApprovalsChanged;
         _assembly                             =  CreateAssembly();
+        Composer.SetBackendConnected(IsBackendConnected);
     }
 
     public ObservableCollection<SessionItemViewModel> Sessions { get; } = [];
@@ -130,9 +128,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
     public AsyncRelayCommand NewSessionCommand { get; }
 
-    public AsyncRelayCommand SendMessageCommand { get; }
-
-    public AsyncRelayCommand CancelCommand { get; }
+    /// <summary>底部输入区子视图模型：草稿与发送/取消；会话/后端上下文由本类在状态变化时推送。</summary>
+    public ComposerViewModel Composer { get; }
 
     public AsyncRelayCommand LoadOlderCommand { get; }
 
@@ -188,21 +185,11 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 RebuildSessionPendingApprovals();
                 // 重建行投影：工作区头的 IsCurrent（是否包含当前会话）随选中变化。
                 RebuildSessionRows();
+                Composer.SetSession(value?.Id, value?.Running ?? false);
                 OnPropertyChanged(nameof(IsSessionRunning));
                 OnPropertyChanged(nameof(IsModelPickerEnabled));
-                SendMessageCommand.RaiseCanExecuteChanged();
-                CancelCommand.RaiseCanExecuteChanged();
                 LoadOlderCommand.RaiseCanExecuteChanged();
             }
-        }
-    }
-
-    public string DraftMessage
-    {
-        get => _draftMessage;
-        set
-        {
-            if (SetProperty(ref _draftMessage, value)) SendMessageCommand.RaiseCanExecuteChanged();
         }
     }
 
@@ -318,20 +305,9 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
     ///     或有任何计费 token 才显示。不能只判 Usage/Stats 非 null：冷会话的 follow
     ///     快照会携带全 0 的投影 wire 视图，占位「—」不该在空对话露出。
     /// </summary>
-    public bool HasStatsData =>
-        Stats is { Steps: > 0 }
-     || Usage is { } usage
-     && usage.UncachedInputTokens + usage.CacheReadTokens + usage.CacheWriteTokens
-      + usage.OutputTokens > 0;
-
-    public bool IsSending
-    {
-        get => _isSending;
-        private set
-        {
-            if (SetProperty(ref _isSending, value)) SendMessageCommand.RaiseCanExecuteChanged();
-        }
-    }
+    public bool HasStatsData => Stats is { Steps: > 0 } || (Usage is { } usage &&
+                                                            usage.UncachedInputTokens + usage.CacheReadTokens +
+                                                            usage.CacheWriteTokens    + usage.OutputTokens > 0);
 
     public string ErrorText
     {
@@ -574,7 +550,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         {
             // 选中会话仍存在：实例未变，不触发重订阅；新增/移除/排序变化仍需重建行投影。
             OnPropertyChanged(nameof(IsSessionRunning));
-            CancelCommand.RaiseCanExecuteChanged();
+            Composer.SetSessionRunning(SelectedSession.Running);
         }
         else
         {
@@ -587,7 +563,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             else
             {
                 OnPropertyChanged(nameof(IsSessionRunning));
-                CancelCommand.RaiseCanExecuteChanged();
+                Composer.SetSessionRunning(SelectedSession?.Running ?? false);
             }
         }
 
@@ -657,8 +633,8 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             foreach (var approval in _toolApprovalService.Pending)
                 if (approval.SessionId == SelectedSession.Id)
                     SessionPendingApprovals.Add(new PendingApprovalViewModel(approval,
-                                                                            ApproveApprovalCommand,
-                                                                            RejectApprovalCommand));
+                                                                             ApproveApprovalCommand,
+                                                                             RejectApprovalCommand));
 
         OnPropertyChanged(nameof(HasSessionPendingApprovals));
     }
@@ -931,64 +907,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
-    private async Task SendMessageAsync()
-    {
-        if (SelectedSession is null || string.IsNullOrWhiteSpace(DraftMessage)) return;
-
-        var draftAtSend = DraftMessage;
-        var content     = draftAtSend.Trim();
-        var requestId   = Guid.NewGuid().ToString();
-        IsSending = true;
-        ErrorText = string.Empty;
-        try
-        {
-            await _sessionService.SendPromptAsync(SelectedSession.Id, requestId, content);
-            if (string.Equals(DraftMessage, draftAtSend, StringComparison.Ordinal)) DraftMessage = string.Empty;
-        }
-        catch (Exception exception)
-        {
-            ErrorText = exception.Message;
-        }
-        finally
-        {
-            IsSending = false;
-        }
-    }
-
-    private async Task CancelGenerationAsync()
-    {
-        if (SelectedSession is null) return;
-
-        _isCancelling = true;
-        CancelCommand.RaiseCanExecuteChanged();
-        try
-        {
-            await _sessionService.CancelAsync(SelectedSession.Id);
-        }
-        catch (Exception exception)
-        {
-            ErrorText = exception.Message;
-        }
-        finally
-        {
-            _isCancelling = false;
-            CancelCommand.RaiseCanExecuteChanged();
-        }
-    }
-
-    private bool CanSendMessage()
-    {
-        return SelectedSession is not null
-            && !IsSending
-            && !string.IsNullOrWhiteSpace(DraftMessage)
-            && IsBackendConnected;
-    }
-
-    private bool CanCancelGeneration()
-    {
-        return IsSessionRunning && !_isCancelling;
-    }
-
     private CancellationTokenSource BeginFollow()
     {
         var cancellation = new CancellationTokenSource();
@@ -1033,7 +951,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             _postToUi(() =>
             {
                 OnPropertyChanged(nameof(IsSessionRunning));
-                CancelCommand.RaiseCanExecuteChanged();
+                Composer.SetSessionRunning(SelectedSession?.Running ?? false);
             });
     }
 
@@ -1079,7 +997,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             OnPropertyChanged(nameof(IsBackendConnected));
             OnPropertyChanged(nameof(IsBackendDisconnected));
             OnPropertyChanged(nameof(IsModelPickerEnabled));
-            SendMessageCommand.RaiseCanExecuteChanged();
+            Composer.SetBackendConnected(IsBackendConnected);
             LoadOlderCommand.RaiseCanExecuteChanged();
             if (IsBackendConnected)
                 // 重连后代目录可能变化，重新拉取（只读，可安全重试）。

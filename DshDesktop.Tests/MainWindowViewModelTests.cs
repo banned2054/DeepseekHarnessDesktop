@@ -54,7 +54,7 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         var viewModel = CreateViewModel();
         await viewModel.InitializeAsync();
         viewModel.SelectedSession = viewModel.Sessions.First(session => session.Id == "session-history");
-        await WaitUntilAsync(() => viewModel.ConversationItems.Count == 5);
+        await WaitUntilAsync(() => viewModel.ConversationItems.Count               == 5);
 
         // 视图以前插锚定补偿翻页跳动，置锚判据是「IsLoadingOlder 窗口内到达的 Reset」：
         // 翻页重建（Clear + 整体重灌，见 RebuildTimeline）的 Reset 必须发生在窗口内，
@@ -83,7 +83,7 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
 
         // 切换会话同样以 Reset 重建时间线，但不得处于 IsLoadingOlder 窗口内：
         // 会话切换的偏移归零属预期行为，进入锚定窗口会把视口抬到错误位置。
-        var sawReset = false;
+        var sawReset                  = false;
         var sawResetWhileLoadingOlder = false;
         viewModel.ConversationItems.CollectionChanged += (_, e) =>
         {
@@ -157,15 +157,15 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         await viewModel.InitializeAsync();
         await WaitUntilAsync(() => viewModel.SelectedSession is not null);
 
-        viewModel.DraftMessage = "第一条消息";
-        viewModel.SendMessageCommand.Execute(null);
+        viewModel.Composer.DraftMessage = "第一条消息";
+        viewModel.Composer.SendMessageCommand.Execute(null);
         await sessionService.SendStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
 
-        viewModel.DraftMessage = "发送期间的新草稿";
+        viewModel.Composer.DraftMessage = "发送期间的新草稿";
         sessionService.ReleaseSend.TrySetResult();
-        await WaitUntilAsync(() => !viewModel.IsSending);
+        await WaitUntilAsync(() => !viewModel.Composer.IsSending);
 
-        Assert.Equal("发送期间的新草稿", viewModel.DraftMessage);
+        Assert.Equal("发送期间的新草稿", viewModel.Composer.DraftMessage);
 
         await viewModel.DisposeAsync();
     }
@@ -568,12 +568,12 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         {
             var now = DateTimeOffset.Now;
             _liveTail.Writer.TryWrite(new SessionUpdate.ToolCallStarted(new ToolActivity(
-                                                                         6, "call-attach-2", "fs.read", "{}",
-                                                                         ToolActivityStatus.Running,
-                                                                         null, null, now, Turn : 1)));
+                                                                             6, "call-attach-2", "fs.read", "{}",
+                                                                             ToolActivityStatus.Running,
+                                                                             null, null, now, Turn : 1)));
             _liveTail.Writer.TryWrite(new SessionUpdate.MessageAppended(new ConversationMessage(
-                                                                         7, "attach-final", MessageRole.Assistant,
-                                                                         "真正的最终回复", now, 1)));
+                                                                             7, "attach-final", MessageRole.Assistant,
+                                                                             "真正的最终回复", now, 1)));
         }
 
         public void PushRealTurnEnd()

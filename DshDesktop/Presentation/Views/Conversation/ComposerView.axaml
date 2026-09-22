@@ -29,7 +29,7 @@
                            TextWrapping="Wrap" />
                 <TextBox x:Name="MessageInput"
                          Classes="composer-input"
-                         Text="{Binding DraftMessage, Mode=TwoWay}"
+                         Text="{Binding Composer.DraftMessage, Mode=TwoWay}"
                          PlaceholderText="输入消息…"
                          AcceptsReturn="True"
                          TextWrapping="Wrap"
@@ -65,8 +65,8 @@
                     </ComboBox>
                     <Panel Grid.Column="3" Width="34" Height="34">
                         <Button Classes="composer-stop"
-                                Command="{Binding CancelCommand}"
-                                IsVisible="{Binding IsSessionRunning}"
+                                Command="{Binding Composer.CancelCommand}"
+                                IsVisible="{Binding Composer.IsSessionRunning}"
                                 ToolTip.Tip="停止生成">
                             <Viewbox Width="15" Height="15">
                                 <Path
@@ -75,8 +75,8 @@
                             </Viewbox>
                         </Button>
                         <Button Classes="composer-send"
-                                Command="{Binding SendMessageCommand}"
-                                IsVisible="{Binding !IsSessionRunning}"
+                                Command="{Binding Composer.SendMessageCommand}"
+                                IsVisible="{Binding !Composer.IsSessionRunning}"
                                 ToolTip.Tip="发送">
                             <Viewbox Width="16" Height="16">
                                 <Path Data="M12 19V5M5 12l7-7 7 7"
