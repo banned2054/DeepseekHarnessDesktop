@@ -1,6 +1,5 @@
 using DshDesktop.Core.Models;
 using DshDesktop.Core.Services;
-using DshDesktop.Utils;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 
@@ -47,18 +46,13 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
     // 默认按工作区分组，对齐参考 Web 客户端的默认视图选项。
     private int                   _sessionListModeIndex = SessionListModeByWorkspace;
-    private SessionStats?         _stats;
-    private long                  _statsSeq;
     private string?               _streamingAttemptId;
     private MessageItemViewModel? _streamingMessage;
 
     // 已加载窗口的全量条目（按 seq 升序）；翻页折叠开关变化时据此整体重建时间线。
     private List<ConversationEntry> _timelineEntries = [];
 
-    // 会话统计：快照投影基线 + control 流整值更新，均带投影 seq 做乱序 gating。
-    private SessionUsage? _usage;
-    private long          _usageSeq;
-    private long          _windowStartSeq = 1;
+    private long _windowStartSeq = 1;
 
     private IReadOnlyList<WorkspaceSummary> _workspaces = [];
 
@@ -169,11 +163,7 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
 
                 // 先重置上一会话的会话级状态再订阅：新会话的当前选型由其快照携带
                 // （模拟实现的快照可能同步到达，先启动订阅再清空会把快照值抹掉）。
-                // SetSession 在会话身份变化时清除上一会话选型并让下拉回退目录默认。
-                Usage     = null;
-                Stats     = null;
-                _usageSeq = 0;
-                _statsSeq = 0;
+                // SetSession 在会话身份变化时清除上一会话选型与统计并让下拉回退目录默认。
                 Composer.SetSession(value?.Id, value?.Running ?? false);
                 _ = FollowSelectedSessionAsync(value);
                 RebuildSessionPendingApprovals();
@@ -184,93 +174,6 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
             }
         }
     }
-
-    /// <summary>当前会话累计 token 计量（whole-log 投影；无数据时为 null）。</summary>
-    public SessionUsage? Usage
-    {
-        get => _usage;
-        private set
-        {
-            if (SetProperty(ref _usage, value))
-            {
-                OnPropertyChanged(nameof(UsageValueText));
-                OnPropertyChanged(nameof(CacheHitValueText));
-                OnPropertyChanged(nameof(UsageDetailText));
-                OnPropertyChanged(nameof(HasStatsData));
-            }
-        }
-    }
-
-    /// <summary>当前会话累计时间/步数统计（whole-log 投影；无数据时为 null）。</summary>
-    public SessionStats? Stats
-    {
-        get => _stats;
-        private set
-        {
-            if (SetProperty(ref _stats, value))
-            {
-                OnPropertyChanged(nameof(SpeedValueText));
-                OnPropertyChanged(nameof(StatsDetailText));
-                OnPropertyChanged(nameof(HasStatsData));
-            }
-        }
-    }
-
-    /// <summary>统计栏 Token 用量文案：总量 = 计费输入（未命中 + 缓存读 + 缓存写）+ 输出。</summary>
-    public string UsageValueText
-    {
-        get
-        {
-            if (Usage is not { } usage) return "Token 用量 —";
-
-            var total = usage.UncachedInputTokens + usage.CacheReadTokens + usage.CacheWriteTokens
-                      + usage.OutputTokens;
-            return total > 0 ? $"Token 用量 {TokenFormat.Compact(total)}" : "Token 用量 —";
-        }
-    }
-
-    /// <summary>统计栏缓存命中率文案：缓存读 / 计费输入；无计费输入时显示 —。</summary>
-    public string CacheHitValueText
-    {
-        get
-        {
-            if (Usage is not { } usage) return "缓存命中 —";
-
-            var billed = usage.UncachedInputTokens + usage.CacheReadTokens + usage.CacheWriteTokens;
-            return TokenFormat.CacheHitPercent(usage.CacheReadTokens, billed) is { } percent
-                ? $"缓存命中 {percent}%"
-                : "缓存命中 —";
-        }
-    }
-
-    /// <summary>统计栏生成速度文案：解码 token / 解码时长；无解码数据时显示 —。</summary>
-    public string SpeedValueText =>
-        Stats is { DecodeMs: > 0 } stats
-            ? $"生成速度 {TokenFormat.TokensPerSecond(stats.DecodeTokens / (stats.DecodeMs / 1000))}"
-            : "生成速度 —";
-
-    /// <summary>usage 明细悬停：四个桶的精确计数。</summary>
-    public string? UsageDetailText =>
-        Usage is { } usage
-            ? $"未命中输入 {usage.UncachedInputTokens} · 缓存读 {usage.CacheReadTokens}"
-            + $" · 缓存写 {usage.CacheWriteTokens} · 输出 {usage.OutputTokens}"
-            : null;
-
-    /// <summary>统计明细悬停：轮次、步数与累计耗时。</summary>
-    public string? StatsDetailText =>
-        Stats is { } stats
-            ? $"{stats.Turns} 轮 · {stats.Steps} 步 · 模型耗时 {stats.LlmMs / 1000:0.#}s"
-            + $" · 工具耗时 {stats.ToolMs                                 / 1000:0.#}s"
-            : null;
-
-    /// <summary>
-    ///     统计条是否显示：对齐 WebUI StatsPills 的空会话口径——出现过至少一步生成
-    ///     或有任何计费 token 才显示。不能只判 Usage/Stats 非 null：冷会话的 follow
-    ///     快照会携带全 0 的投影 wire 视图，占位「—」不该在空对话露出。
-    /// </summary>
-    public bool HasStatsData => Stats is { Steps: > 0 } || (Usage is { } usage &&
-                                                            usage.UncachedInputTokens + usage.CacheReadTokens +
-                                                            usage.CacheWriteTokens    + usage.OutputTokens > 0);
 
     public string ErrorText
     {
@@ -659,15 +562,13 @@ public sealed class MainWindowViewModel : ObservableObject, IAsyncDisposable
                 Composer.ApplyCurrentModel(selected.Selection);
                 break;
 
-            // 统计整值更新带投影 seq：乱序到达的旧值（重连竞态）直接忽略。
-            case SessionUpdate.UsageUpdated usage when usage.Seq >= _usageSeq :
-                _usageSeq = usage.Seq;
-                Usage     = usage.Usage;
+            // 统计整值更新转发 Composer；乱序 seq 的 gating 由其持有（会话级状态）。
+            case SessionUpdate.UsageUpdated usage :
+                Composer.ApplyUsage(usage.Seq, usage.Usage);
                 break;
 
-            case SessionUpdate.StatsUpdated statsUpdate when statsUpdate.Seq >= _statsSeq :
-                _statsSeq = statsUpdate.Seq;
-                Stats     = statsUpdate.Stats;
+            case SessionUpdate.StatsUpdated statsUpdate :
+                Composer.ApplyStats(statsUpdate.Seq, statsUpdate.Stats);
                 break;
 
             case SessionUpdate.StreamStarted started :

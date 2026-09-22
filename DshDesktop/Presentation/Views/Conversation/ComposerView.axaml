@@ -93,12 +93,12 @@
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
             <StackPanel Classes="composer-stats"
                         Orientation="Horizontal"
-                        IsVisible="{Binding HasStatsData}"
-                        ToolTip.Tip="{Binding UsageDetailText}">
-                <TextBlock Text="{Binding UsageValueText}" Classes="composer-stat" />
-                <TextBlock Text="{Binding CacheHitValueText}" Classes="composer-stat" />
-                <TextBlock Text="{Binding SpeedValueText}" Classes="composer-stat"
-                           ToolTip.Tip="{Binding StatsDetailText}" />
+                        IsVisible="{Binding Composer.HasStatsData}"
+                        ToolTip.Tip="{Binding Composer.UsageDetailText}">
+                <TextBlock Text="{Binding Composer.UsageValueText}" Classes="composer-stat" />
+                <TextBlock Text="{Binding Composer.CacheHitValueText}" Classes="composer-stat" />
+                <TextBlock Text="{Binding Composer.SpeedValueText}" Classes="composer-stat"
+                           ToolTip.Tip="{Binding Composer.StatsDetailText}" />
             </StackPanel>
             <TextBlock Grid.Column="1"
                        Text="Enter 发送 · Shift+Enter 换行"

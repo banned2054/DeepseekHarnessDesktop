@@ -1,5 +1,5 @@
-using System.Windows.Input;
 using DshDesktop.Core.Models;
+using System.Windows.Input;
 
 namespace DshDesktop.ViewModels;
 

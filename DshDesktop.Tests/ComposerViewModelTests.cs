@@ -270,6 +270,114 @@ public sealed class ComposerViewModelTests
         Assert.Equal("model-z", composer.SelectedModelOption?.Model);
     }
 
+    [Fact]
+    public void UsageUpdateSetsStateAndDerivedDisplayTexts()
+    {
+        var composer = CreateComposer();
+        composer.SetSession("session-1", isRunning : false);
+        Assert.False(composer.HasStatsData);
+
+        composer.ApplyUsage(10, new SessionUsage(UncachedInputTokens : 400, OutputTokens : 100,
+                                                 CacheReadTokens : 100, CacheWriteTokens : 0));
+
+        Assert.Equal(new SessionUsage(400, 100, 100, 0), composer.Usage);
+        Assert.True(composer.HasStatsData);
+        // 总量 = 计费输入（400+100+0）+ 输出 100；命中率 = 100/500。
+        Assert.Equal("Token 用量 600", composer.UsageValueText);
+        Assert.Equal("缓存命中 20%", composer.CacheHitValueText);
+        Assert.Equal("未命中输入 400 · 缓存读 100 · 缓存写 0 · 输出 100", composer.UsageDetailText);
+    }
+
+    [Fact]
+    public void StaleUsageSeqDoesNotOverwriteNewerUsage()
+    {
+        var composer = CreateComposer();
+        composer.SetSession("session-1", isRunning : false);
+
+        composer.ApplyUsage(20, new SessionUsage(400, 100, 100, 0));
+        // 乱序到达的旧 seq（重连竞态）被忽略。
+        composer.ApplyUsage(15, new SessionUsage(9, 9, 9, 9));
+        Assert.Equal(new SessionUsage(400, 100, 100, 0), composer.Usage);
+
+        // 同 seq 重复到达照常接受（整值幂等重放）。
+        composer.ApplyUsage(20, new SessionUsage(500, 100, 100, 0));
+        Assert.Equal(new SessionUsage(500, 100, 100, 0), composer.Usage);
+    }
+
+    [Fact]
+    public void StatsUpdateSetsStateAndDerivedDisplayTexts()
+    {
+        var composer = CreateComposer();
+        composer.SetSession("session-1", isRunning : false);
+
+        // 仅凭 stats 的步数即满足统计条显示口径。
+        composer.ApplyStats(10, new SessionStats(Turns : 2, Steps : 3, LlmMs : 2400, ToolMs : 800,
+                                                 TtftMs : 0, TtftSteps : 0, DecodeMs : 2000,
+                                                 DecodeTokens : 300));
+
+        Assert.Equal(new SessionStats(2, 3, 2400, 800, 0, 0, 2000, 300), composer.Stats);
+        Assert.True(composer.HasStatsData);
+        Assert.Equal("生成速度 150 tok/s", composer.SpeedValueText);
+        Assert.Equal("2 轮 · 3 步 · 模型耗时 2.4s · 工具耗时 0.8s", composer.StatsDetailText);
+    }
+
+    [Fact]
+    public void StaleStatsSeqDoesNotOverwriteNewerStats()
+    {
+        var composer = CreateComposer();
+        composer.SetSession("session-1", isRunning : false);
+
+        composer.ApplyStats(30, new SessionStats(Turns : 2, Steps : 3, LlmMs : 2400, ToolMs : 800,
+                                                 TtftMs : 0, TtftSteps : 0, DecodeMs : 2000,
+                                                 DecodeTokens : 300));
+        composer.ApplyStats(25, new SessionStats(9, 9, 9, 9, 9, 9, 9, 9));
+
+        Assert.Equal(new SessionStats(2, 3, 2400, 800, 0, 0, 2000, 300), composer.Stats);
+    }
+
+    [Fact]
+    public void SessionSwitchClearsUsageStatsAndRestartsSeqGating()
+    {
+        var composer = CreateComposer();
+        composer.SetSession("session-a", isRunning : false);
+        composer.ApplyUsage(100, new SessionUsage(400, 100, 100, 0));
+        composer.ApplyStats(100, new SessionStats(2, 3, 2400, 800, 0, 0, 2000, 300));
+
+        composer.SetSession("session-b", isRunning : false);
+
+        // 上一会话的统计与 seq gating 一并清零，统计条隐藏。
+        Assert.Null(composer.Usage);
+        Assert.Null(composer.Stats);
+        Assert.False(composer.HasStatsData);
+
+        // 新会话的首批整值 seq 从头计（小于上一会话的 100）也可正常接受。
+        composer.ApplyUsage(1, new SessionUsage(10, 5, 0, 0));
+        composer.ApplyStats(1, new SessionStats(1, 1, 100, 0, 0, 0, 0, 0));
+        Assert.Equal(new SessionUsage(10, 5, 0, 0), composer.Usage);
+        Assert.Equal(new SessionStats(1, 1, 100, 0, 0, 0, 0, 0), composer.Stats);
+    }
+
+    [Fact]
+    public void RunningAndConnectionChangesDoNotClearUsageStats()
+    {
+        var composer = CreateComposer();
+        composer.SetSession("session-a", isRunning : false);
+        var usage = new SessionUsage(400, 100, 100, 0);
+        composer.ApplyUsage(10, usage);
+        composer.ApplyStats(10, new SessionStats(2, 3, 2400, 800, 0, 0, 2000, 300));
+
+        // 运行状态、后端连接与同会话的上下文刷新（SetSession 同 id）都不得清除统计。
+        composer.SetSessionRunning(true);
+        composer.SetSessionRunning(false);
+        composer.SetBackendConnected(false);
+        composer.SetBackendConnected(true);
+        composer.SetSession("session-a", isRunning : true);
+
+        Assert.Equal(usage, composer.Usage);
+        Assert.NotNull(composer.Stats);
+        Assert.True(composer.HasStatsData);
+    }
+
     private static ComposerViewModel CreateComposer()
     {
         return new ComposerViewModel(new ControllableSessionService(), _ => { });

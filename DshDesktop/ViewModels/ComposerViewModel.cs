@@ -1,13 +1,14 @@
 using DshDesktop.Core.Models;
 using DshDesktop.Core.Services;
+using DshDesktop.Utils;
 using System.Collections.ObjectModel;
 
 namespace DshDesktop.ViewModels;
 
 /// <summary>
-///     底部输入区子视图模型：草稿编辑、发送/取消与模型选择。目标会话与后端连接状态是
+///     底部输入区子视图模型：草稿编辑、发送/取消、模型选择与统计条。目标会话与后端连接状态是
 ///     外部推送的快照（由 MainWindowViewModel 在选中会话、运行状态与连接状态变化时同步），
-///     本类不持有会话条目、不订阅后端事件；生效选型由 root 转发的 follow 快照与回声更新，
+///     本类不持有会话条目、不订阅后端事件；生效选型与统计整值由 root 转发的 follow 更新驱动，
 ///     发送/取消/选型失败经回调上报给窗口级错误显示。
 /// </summary>
 public sealed class ComposerViewModel : ObservableObject
@@ -20,6 +21,12 @@ public sealed class ComposerViewModel : ObservableObject
     private ModelSelection?       _currentModel;
     private ModelCatalog?         _modelCatalog;
     private ModelOptionViewModel? _selectedModelOption;
+
+    // 会话统计：整值更新带投影 seq 做乱序 gating；seq 归 root 转发，本类持有判定。
+    private SessionStats? _stats;
+    private long          _statsSeq;
+    private SessionUsage? _usage;
+    private long          _usageSeq;
 
     private string  _draftMessage = string.Empty;
     private bool    _isBackendConnected;
@@ -121,13 +128,101 @@ public sealed class ComposerViewModel : ObservableObject
     /// <summary>下拉是否可用：目录已加载、有选中会话且后端已连接。</summary>
     public bool IsModelPickerEnabled => ModelOptions.Count > 0 && SessionId is not null && IsBackendConnected;
 
+    /// <summary>当前会话累计 token 计量（whole-log 投影；无数据时为 null）。</summary>
+    public SessionUsage? Usage
+    {
+        get => _usage;
+        private set
+        {
+            if (SetProperty(ref _usage, value))
+            {
+                OnPropertyChanged(nameof(UsageValueText));
+                OnPropertyChanged(nameof(CacheHitValueText));
+                OnPropertyChanged(nameof(UsageDetailText));
+                OnPropertyChanged(nameof(HasStatsData));
+            }
+        }
+    }
+
+    /// <summary>当前会话累计时间/步数统计（whole-log 投影；无数据时为 null）。</summary>
+    public SessionStats? Stats
+    {
+        get => _stats;
+        private set
+        {
+            if (SetProperty(ref _stats, value))
+            {
+                OnPropertyChanged(nameof(SpeedValueText));
+                OnPropertyChanged(nameof(StatsDetailText));
+                OnPropertyChanged(nameof(HasStatsData));
+            }
+        }
+    }
+
+    /// <summary>统计栏 Token 用量文案：总量 = 计费输入（未命中 + 缓存读 + 缓存写）+ 输出。</summary>
+    public string UsageValueText
+    {
+        get
+        {
+            if (Usage is not { } usage) return "Token 用量 —";
+
+            var total = usage.UncachedInputTokens + usage.CacheReadTokens + usage.CacheWriteTokens
+                      + usage.OutputTokens;
+            return total > 0 ? $"Token 用量 {TokenFormat.Compact(total)}" : "Token 用量 —";
+        }
+    }
+
+    /// <summary>统计栏缓存命中率文案：缓存读 / 计费输入；无计费输入时显示 —。</summary>
+    public string CacheHitValueText
+    {
+        get
+        {
+            if (Usage is not { } usage) return "缓存命中 —";
+
+            var billed = usage.UncachedInputTokens + usage.CacheReadTokens + usage.CacheWriteTokens;
+            return TokenFormat.CacheHitPercent(usage.CacheReadTokens, billed) is { } percent
+                ? $"缓存命中 {percent}%"
+                : "缓存命中 —";
+        }
+    }
+
+    /// <summary>统计栏生成速度文案：解码 token / 解码时长；无解码数据时显示 —。</summary>
+    public string SpeedValueText =>
+        Stats is { DecodeMs: > 0 } stats
+            ? $"生成速度 {TokenFormat.TokensPerSecond(stats.DecodeTokens / (stats.DecodeMs / 1000))}"
+            : "生成速度 —";
+
+    /// <summary>usage 明细悬停：四个桶的精确计数。</summary>
+    public string? UsageDetailText =>
+        Usage is { } usage
+            ? $"未命中输入 {usage.UncachedInputTokens} · 缓存读 {usage.CacheReadTokens}"
+            + $" · 缓存写 {usage.CacheWriteTokens} · 输出 {usage.OutputTokens}"
+            : null;
+
+    /// <summary>统计明细悬停：轮次、步数与累计耗时。</summary>
+    public string? StatsDetailText =>
+        Stats is { } stats
+            ? $"{stats.Turns} 轮 · {stats.Steps} 步 · 模型耗时 {stats.LlmMs / 1000:0.#}s"
+            + $" · 工具耗时 {stats.ToolMs                                 / 1000:0.#}s"
+            : null;
+
+    /// <summary>
+    ///     统计条是否显示：对齐 WebUI StatsPills 的空会话口径——出现过至少一步生成
+    ///     或有任何计费 token 才显示。不能只判 Usage/Stats 非 null：冷会话的 follow
+    ///     快照会携带全 0 的投影 wire 视图，占位「—」不该在空对话露出。
+    /// </summary>
+    public bool HasStatsData => Stats is { Steps: > 0 } || (Usage is { } usage &&
+                                                            usage.UncachedInputTokens + usage.CacheReadTokens +
+                                                            usage.CacheWriteTokens    + usage.OutputTokens > 0);
+
     /// <summary>展示用生效选型：会话未选过型时回退目录默认。</summary>
     private ModelSelection? EffectiveModel => _currentModel ?? _modelCatalog?.Default;
 
     /// <summary>
     ///     选中会话变化时整体替换上下文；isRunning 取新会话当前的运行状态。会话身份变化时
     ///     重置会话级选型并让下拉回退目录默认——必须在新会话 follow 启动前调用，否则清空
-    ///     动作会把随后（可能同步）到达的新会话快照选型抹掉。
+    ///     动作会把随后（可能同步）到达的新会话快照选型抹掉。Usage/Stats 与其 seq 同属
+    ///     会话级状态一并清零，让新会话的首批整值（seq 从头计）可被正常接受。
     /// </summary>
     public void SetSession(string? sessionId, bool isRunning)
     {
@@ -137,6 +232,10 @@ public sealed class ComposerViewModel : ObservableObject
         if (!sessionChanged) return;
 
         CurrentModel = null;
+        _usageSeq    = 0;
+        _statsSeq    = 0;
+        Usage        = null;
+        Stats        = null;
         SyncSelectedModelOption();
     }
 
@@ -154,6 +253,24 @@ public sealed class ComposerViewModel : ObservableObject
     public void ApplyCurrentModel(ModelSelection? selection)
     {
         CurrentModel = selection;
+    }
+
+    /// <summary>接收 root 转发的 usage 整值更新：乱序到达的旧 seq（重连竞态）直接忽略。</summary>
+    public void ApplyUsage(long seq, SessionUsage usage)
+    {
+        if (seq < _usageSeq) return;
+
+        _usageSeq = seq;
+        Usage     = usage;
+    }
+
+    /// <summary>接收 root 转发的 stats 整值更新：乱序到达的旧 seq（重连竞态）直接忽略。</summary>
+    public void ApplyStats(long seq, SessionStats stats)
+    {
+        if (seq < _statsSeq) return;
+
+        _statsSeq = seq;
+        Stats     = stats;
     }
 
     private async Task SelectModelAsync(ModelOptionViewModel option)

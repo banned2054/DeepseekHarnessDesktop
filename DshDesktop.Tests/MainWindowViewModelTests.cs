@@ -27,9 +27,9 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         }
         catch (Xunit.Sdk.XunitException)
         {
-            output.WriteLine($"等待超时现场：selected={viewModel.SelectedSession?.Id} " +
-                             $"usage={viewModel.Usage?.ToString() ?? "<null>"} " +
-                             $"stats={viewModel.Stats?.ToString() ?? "<null>"} " +
+            output.WriteLine($"等待超时现场：selected={viewModel.SelectedSession?.Id} "          +
+                             $"usage={viewModel.Composer.Usage?.ToString() ?? "<null>"} " +
+                             $"stats={viewModel.Composer.Stats?.ToString() ?? "<null>"} " +
                              $"error=\"{viewModel.ErrorText}\" items={viewModel.ConversationItems.Count}");
             throw;
         }
@@ -297,24 +297,24 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         await viewModel.InitializeAsync();
 
         // 默认选中长会话（4 轮 8 条助手消息）：快照统计基线到达，文案带真实数值。
-        await WaitUntilAsync(() => viewModel.Usage is { OutputTokens: > 0 } && viewModel.Stats is { Steps: > 0 });
-        Assert.DoesNotContain("—", viewModel.UsageValueText, StringComparison.Ordinal);
-        Assert.DoesNotContain("—", viewModel.SpeedValueText, StringComparison.Ordinal);
-        var longUsage = viewModel.Usage!;
+        await WaitUntilAsync(() => viewModel.Composer is { Usage : { OutputTokens: > 0 }, Stats.Steps: > 0 });
+        Assert.DoesNotContain("—", viewModel.Composer.UsageValueText, StringComparison.Ordinal);
+        Assert.DoesNotContain("—", viewModel.Composer.SpeedValueText, StringComparison.Ordinal);
+        var longUsage = viewModel.Composer.Usage!;
 
         // 切到单条助手消息的会话：统计按会话重置并携带该会话的累计值。
         viewModel.SelectedSession = viewModel.Sessions.First(session => session.Id == "session-design");
         await WaitUntilAsync(() => viewModel.SelectedSession!.Id == "session-design" &&
-                                   viewModel.Usage is { OutputTokens: > 0 });
-        Assert.True(viewModel.Usage!.OutputTokens < longUsage.OutputTokens);
-        Assert.Equal(viewModel.Usage.UncachedInputTokens + viewModel.Usage.CacheReadTokens +
-                     viewModel.Usage.CacheWriteTokens    + viewModel.Usage.OutputTokens > 0,
-                     !viewModel.UsageValueText.Contains('—'));
+                                   viewModel.Composer.Usage is { OutputTokens: > 0 });
+        Assert.True(viewModel.Composer.Usage!.OutputTokens < longUsage.OutputTokens);
+        Assert.Equal(viewModel.Composer.Usage.UncachedInputTokens + viewModel.Composer.Usage.CacheReadTokens +
+                     viewModel.Composer.Usage.CacheWriteTokens    + viewModel.Composer.Usage.OutputTokens > 0,
+                     !viewModel.Composer.UsageValueText.Contains('—'));
 
         // 新增一步计费后统计整值更新。
-        var before = viewModel.Usage!.OutputTokens;
+        var before = viewModel.Composer.Usage!.OutputTokens;
         sessionService.PushAssistantReply("session-design", "累计一步计费的回复");
-        await WaitUntilAsync(() => viewModel.Usage is { } usage && usage.OutputTokens > before);
+        await WaitUntilAsync(() => viewModel.Composer.Usage is { } usage && usage.OutputTokens > before);
         Assert.False(viewModel.HasError);
 
         await viewModel.DisposeAsync();
@@ -329,29 +329,31 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         await viewModel.InitializeAsync();
 
         // 默认选中的长会话有计费步：统计条可见。
-        await WaitUntilAsync(() => viewModel.HasStatsData);
+        await WaitUntilAsync(() => viewModel.Composer.HasStatsData);
 
         // 新建空会话：follow 快照会回填全 0 的 usage/stats 整值（对齐真实后端冷会话
         // 携带投影 wire 视图的口径），统计条保持隐藏，不显示占位「—」。
         viewModel.NewSessionCommand.Execute(null);
         await WaitUntilAsync(() => viewModel.SelectedSession is { Id: not "session-history" });
         // 等待零值基线本身：仅判非 null 可能命中上一会话尚未清空的旧值（短暂可见性窗口）。
-        await WaitOrDumpAsync(viewModel, () => viewModel.Usage is { OutputTokens: 0, UncachedInputTokens: 0 }
-                                            && viewModel.Stats is { Steps       : 0 }, 5000);
-        Assert.False(viewModel.HasStatsData);
+        await WaitOrDumpAsync(viewModel,
+                              () => viewModel.Composer is
+                                  { Usage : { OutputTokens: 0, UncachedInputTokens: 0 }, Stats.Steps: 0 }, 5000);
+        Assert.False(viewModel.Composer.HasStatsData);
 
         // 首条助手回复落地：投影转为非零，统计条出现。
         var blankSessionId = viewModel.SelectedSession!.Id;
         sessionService.PushAssistantReply(blankSessionId, "空会话的第一条回复");
-        await WaitUntilAsync(() => viewModel.HasStatsData);
+        await WaitUntilAsync(() => viewModel.Composer.HasStatsData);
         Assert.False(viewModel.HasError);
 
         // 再切到另一个空会话：按会话重置后重新隐藏。
         viewModel.NewSessionCommand.Execute(null);
         await WaitUntilAsync(() => viewModel.SelectedSession!.Id != blankSessionId);
-        await WaitOrDumpAsync(viewModel, () => viewModel.Usage is { OutputTokens: 0, UncachedInputTokens: 0 }
-                                            && viewModel.Stats is { Steps       : 0 }, 5000);
-        Assert.False(viewModel.HasStatsData);
+        await WaitOrDumpAsync(viewModel,
+                              () => viewModel.Composer is
+                                  { Usage : { OutputTokens: 0, UncachedInputTokens: 0 }, Stats.Steps: 0 }, 5000);
+        Assert.False(viewModel.Composer.HasStatsData);
 
         await viewModel.DisposeAsync();
     }
@@ -569,12 +571,12 @@ public sealed class MainWindowViewModelTests(ITestOutputHelper output)
         {
             var now = DateTimeOffset.Now;
             _liveTail.Writer.TryWrite(new SessionUpdate.ToolCallStarted(new ToolActivity(
-                                                                             6, "call-attach-2", "fs.read", "{}",
-                                                                             ToolActivityStatus.Running,
-                                                                             null, null, now, Turn : 1)));
+                                                                         6, "call-attach-2", "fs.read", "{}",
+                                                                         ToolActivityStatus.Running,
+                                                                         null, null, now, Turn : 1)));
             _liveTail.Writer.TryWrite(new SessionUpdate.MessageAppended(new ConversationMessage(
-                                                                             7, "attach-final", MessageRole.Assistant,
-                                                                             "真正的最终回复", now, 1)));
+                                                                         7, "attach-final", MessageRole.Assistant,
+                                                                         "真正的最终回复", now, 1)));
         }
 
         public void PushRealTurnEnd()
